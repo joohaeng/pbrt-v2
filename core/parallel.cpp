@@ -30,7 +30,10 @@
 #endif // PBRT_USE_GRAND_CENTRAL_DISPATCH
 #ifndef WIN32
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/param.h>
 #include <sys/sysctl.h>
 #endif // WIN32
 #include <list>
@@ -459,11 +462,20 @@ void RWMutexLock::DowngradeToRead() {
 #endif // WIN32
 #ifdef PBRT_HAS_PTHREADS
 Semaphore::Semaphore() {
+#ifdef __OpenBSD__
+    sem = (sem_t *)malloc(sizeof(sem_t));
+    if (!sem)
+        Severe("Error from sem_open");
+    int err = sem_init(sem, 0, 0);
+    if (err == -1)
+        Severe("Error from sem_init: %s", strerror(err));
+#else
     char name[32];
     sprintf(name, "pbrt.%d-%d", (int)getpid(), count++);
     sem = sem_open(name, O_CREAT, S_IRUSR|S_IWUSR, 0);
     if (!sem)
         Severe("Error from sem_open");
+#endif // !__OpenBSD__
 }
 
 
@@ -482,9 +494,17 @@ int Semaphore::count = 0;
 #endif // PBRT_HAS_PTHREADS
 #ifdef PBRT_HAS_PTHREADS
 Semaphore::~Semaphore() {
+#ifdef __OpenBSD__
+    int err = sem_destroy(sem);
+    free((void *)sem);
+    sem = NULL;
+    if (err != 0)
+        Severe("Error from sem_destroy: %s", strerror(err));
+#else
     int err;
     if ((err = sem_close(sem)) != 0)
         Severe("Error from sem_close: %s", strerror(err));
+#endif // !__OpenBSD__
 }
 
 
@@ -846,7 +866,18 @@ int NumSystemCores() {
     return sysconf(_SC_NPROCESSORS_ONLN);
 #else
     // mac/bsds
-    int mib[2] = { CTL_HW, HW_AVAILCPU };
+#ifdef __OpenBSD__
+    int mib[2] = { CTL_HW, HW_NCPU };
+#else
+    int mib[2];
+    mib[0] = CTL_HW;
+    size_t length = 2;
+    if (sysctlnametomib("hw.logicalcpu", mib, &length) == -1) {
+        Error("sysctlnametomib() filed.  Guessing 2 CPU cores.");
+        return 2;
+    }
+    Assert(length == 2);
+#endif
     int nCores = 0;
     size_t size = sizeof(nCores);
 

@@ -1,12 +1,20 @@
 ARCH = $(shell uname)
- 
+
 # user-configuration section
- 
-EXRINCLUDE=-I/opt/local/include/OpenEXR
-EXRLIBDIR=-L/opt/local/lib
- 
-DEFS=-DPBRT_STATS_NONE -DPBRT_POINTER_SIZE=4 -DPBRT_HAS_PTHREADS -DPBRT_HAS_OPENEXR
- 
+
+EXRINCLUDE=-I/usr/local/include/OpenEXR -I/usr/include/OpenEXR
+EXRLIBDIR=-L/usr/local/lib
+
+DEFS=-DPBRT_STATS_NONE -DPBRT_HAS_PTHREADS -DPBRT_HAS_OPENEXR
+
+# 32 bit
+DEFS+=-DPBRT_POINTER_SIZE=4
+MARCH=-m32
+
+# 64 bit
+#DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
+#MARCH=-m64
+
 #########################################################################
  
 LEX=flex
@@ -17,6 +25,9 @@ EXRLIBS=$(EXRLIBDIR) -Bstatic -lIex -lIlmImf -lIlmThread -lImath -lIex -lHalf -B
 ifeq ($(ARCH),Linux)
   EXRLIBS += -lpthread
 endif
+ifeq ($(ARCH),OpenBSD)
+  EXRLIBS += -lpthread
+endif
 ifeq ($(ARCH),Darwin)
   EXRLIBS += -lz
 endif
@@ -24,14 +35,14 @@ endif
 CC=gcc
 CXX=g++
 LD=$(CXX) $(OPT)
-OPT=-O2 -m32 -msse2 -mfpmath=sse
+OPT=-O2 $(MARCH) -msse2 -mfpmath=sse
 INCLUDE=-I. -Icore $(EXRINCLUDE)
 WARN=-Wall
 CWD=$(shell pwd)
 CXXFLAGS=$(OPT) $(INCLUDE) $(WARN) $(DEFS)
 CCFLAGS=$(CXXFLAGS)
-LIBS=$(LEXLIB) $(DLLLIB) $(EXRLIBDIR) $(EXRLIBS) -lm 
- 
+LIBS=$(LEXLIB) $(EXRLIBDIR) $(EXRLIBS) -lm 
+
 LIBSRCS=$(wildcard core/*.cpp) core/pbrtlex.cpp core/pbrtparse.cpp
 LIBSRCS += $(wildcard accelerators/*.cpp cameras/*.cpp film/*.cpp filters/*.cpp )
 LIBSRCS += $(wildcard integrators/*.cpp lights/*.cpp materials/*.cpp renderers/*.cpp )
