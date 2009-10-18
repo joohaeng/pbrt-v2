@@ -96,6 +96,9 @@ Spectrum ScaledBxDF::Sample_f(const Vector &wo, Vector *wi,
     return s * f;
 }
 
+Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
+    return s * bxdf->f(wo, wi);
+}
 
 Fresnel::~Fresnel() { }
 Spectrum FresnelConductor::Evaluate(float cosi) const {

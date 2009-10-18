@@ -1,3 +1,6 @@
 *.swp
+bin/
 objs/*.o
 scenes/*.exr
+scenes/*.log
+scenes/*.tiff
