@@ -1,0 +1,3 @@
+*.swp
+objs/*.o
+scenes/*.exr

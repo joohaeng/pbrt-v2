@@ -68,6 +68,8 @@
 #include "lights/spot.h"
 #include "materials/glass.h"
 #include "materials/kdsubsurface.h"
+#include "materials/layered.h"
+#include "materials/matte.h"
 #include "materials/matte.h"
 #include "materials/measured.h"
 #include "materials/metal.h"
@@ -353,6 +355,24 @@ Reference<Material> MakeMaterial(const string &name,
         material = CreateGlassMaterial(mtl2world, mp);
     else if (name == "mirror")
         material = CreateMirrorMaterial(mtl2world, mp);
+    else if (name == "layered") {
+        string m1 = mp.FindString("namedmaterial1", "");
+        string m2 = mp.FindString("namedmaterial2", "");
+        Reference<Material> mat1 = graphicsState.namedMaterials[m1];
+        Reference<Material> mat2 = graphicsState.namedMaterials[m2];
+        if (!mat1) {
+            Error("Named material \"%s\" undefined.  Using \"plastic\"",
+                  m1.c_str());
+            mat1 = MakeMaterial("plastic", curTransform[0], mp);
+        }
+        if (!mat2) {
+            Error("Named material \"%s\" undefined.  Using \"matte\"",
+                  m2.c_str());
+            mat2 = MakeMaterial("matte", curTransform[0], mp);
+        }
+
+        material = CreateMixMaterial(mtl2world, mp, mat1, mat2);
+    }
     else if (name == "mix") {
         string m1 = mp.FindString("namedmaterial1", "");
         string m2 = mp.FindString("namedmaterial2", "");

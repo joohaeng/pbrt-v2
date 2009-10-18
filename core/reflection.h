@@ -181,6 +181,7 @@ private:
 #define MAX_BxDFS 8
     BxDF *bxdfs[MAX_BxDFS];
     friend class MixMaterial;
+    friend class LayeredMaterial;
 };
 
 
@@ -257,6 +258,30 @@ private:
     Spectrum s;
 };
 
+class LayeredBxDF : public BxDF {
+public:
+    // LayeredBxDF Public Methods
+    LayeredBxDF(BxDF *b, const Spectrum &a, fresnel *f)
+        : BxDF(BxDFType(b->type)) {
+        bxdf = b;
+        s = sc;
+    }
+    Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
+        return s * bxdf->rho(w, nSamples, samples);
+    }
+    Spectrum rho(int nSamples, const float *samples1,
+        const float *samples2) const {
+        return s * bxdf->rho(nSamples, samples1, samples2);
+    }
+    Spectrum f(const Vector &wo, const Vector &wi) const;
+    Spectrum Sample_f(const Vector &wo, Vector *wi,
+        float u1, float u2, float *pdf) const;
+private:
+    BxDF *bxdf;
+    Spectrum absorption; //absorption
+    Fresnel *fresnel;
+
+};
 
 class Fresnel {
 public:
