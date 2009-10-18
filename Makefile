@@ -2,8 +2,13 @@ ARCH = $(shell uname)
 
 # user-configuration section
 
-EXRINCLUDE=-I/usr/local/include/OpenEXR -I/usr/include/OpenEXR
-EXRLIBDIR=-L/usr/local/lib
+# LINUX or UNIX
+#EXRINCLUDE=-I/usr/local/include/OpenEXR -I/usr/include/OpenEXR
+#EXRLIBDIR=-L/usr/local/lib
+
+# OSX
+EXRINCLUDE=-I/opt/local/include/OpenEXR -I/opt/include/OpenEXR
+EXRLIBDIR=-L/opt/local/lib
 
 DEFS=-DPBRT_STATS_NONE -DPBRT_HAS_PTHREADS -DPBRT_HAS_OPENEXR
 
