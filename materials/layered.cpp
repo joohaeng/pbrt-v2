@@ -34,15 +34,25 @@
 BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
       const DifferentialGeometry &dgShading,
       MemoryArena &arena) const {
-    BSDF *b1 = m1->GetBSDF(dgGeom, dgShading, arena);
-    BSDF *b2 = m2->GetBSDF(dgGeom, dgShading, arena);
-    Spectrum s1 = scale->Evaluate(dgShading).Clamp();
-    Spectrum s2 = Spectrum(1.f) - s1;
-    int n1 = b1->NumComponents(), n2 = b2->NumComponents();
-    for (int i = 0; i < n1; ++i)
-        b1->bxdfs[i] = BSDF_ALLOC(arena, ScaledBxDF)(b1->bxdfs[i], s1);
+    // Allocate _BSDF_, possibly doing bump mapping with _bumpMap_
+
+    BSDF *b1 = m1->GetBSDF(dgGeom, dgShading, arena); // m1: coating layer
+    BSDF *b2 = m2->GetBSDF(dgGeom, dgShading, arena); // m2: base layer
+
+    float eta_i = 1.0; //ior1->Evaluate(dgs); // air
+    float eta_t = ior->Evaluate(dgShading); // coating
+
+    Fresnel *f12 = BSDF_ALLOC(arena, FresnelDielectric)(eta_i, eta_t);
+    Fresnel *f21 = BSDF_ALLOC(arena, FresnelDielectric)(eta_t, eta_i);
+
+    Spectrum a = absorption->Evaluate(dgShading).Clamp();
+    float d = thickness->Evaluate(dgShading);
+
+    // Create a layered material on top of base b2 considering the paramters of coating b1: Fresnel, absorption, depth
+    int n2 = b2->NumComponents();
     for (int i = 0; i < n2; ++i)
-        b1->Add(BSDF_ALLOC(arena, ScaledBxDF)(b2->bxdfs[i], s2));
+        b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t));
+
     return b1;
 }
 
@@ -50,11 +60,9 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
 LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
         const TextureParams &mp, const Reference<Material> &m1,
         const Reference<Material> &m2) {
-    Reference<Texture<Spectrum> > scale = mp.GetSpectrumTexture("absorption", Spectrum(0.5f));
-    Reference<Texture<float> > ior1 = mp.GetFloatTexture("ior1", float(1.0f));
-    Reference<Texture<float> > ior2 = mp.GetFloatTexture("ior2", float(1.0f));
-    Reference<Texture<float> > thickness = mp.GetFloatTexture("thickness", float(1.0f));
-    return new LayeredMaterial(m1, m2, scale);
+    Reference<Texture<float> > ior = mp.GetFloatTexture("ior", float(1.5f)); // ior of m1: default 1.5 for glass
+    Reference<Texture<float> > d = mp.GetFloatTexture("thickness", float(1.0f));
+    Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.5f));
+    return new LayeredMaterial(m1, m2, ior, d, a);
 }
-
 

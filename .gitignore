@@ -1,6 +1,9 @@
+*/.DS_Store
 *.swp
 bin/
+bin/pbrt
 objs/*.o
+objs/*.a
 scenes/*.exr
 scenes/*.log
 scenes/*.tiff

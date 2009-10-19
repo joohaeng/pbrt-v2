@@ -97,7 +97,21 @@ Spectrum ScaledBxDF::Sample_f(const Vector &wo, Vector *wi,
 }
 
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
-    return s * bxdf->f(wo, wi);
+	// wor, wir: refracted direction of wi and wo in the coating layer, respectively
+	Vector wor = SnellDir(wo, etai, etat);
+	Vector wir = SnellDir(wi, etai, etat);
+    Vector whr = Normalize(wir + wor);
+	Spectrum alpha = Exp(-alpha * depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor)));
+	float g = G(wor, wir, whr);
+	Spectrum t = (Spectrum(1.f) - Spectrum(g)) \
+		+ (Spectrum(1.f) - f21->Evaluate(CosTheta(wor))) * Spectrum(g);
+    return (Spectrum(1.f) - f12->Evaluate(CosTheta(wi))) * bxdf->f(wor, wir) * alpha * t;
+}
+
+Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
+                              float u1, float u2, float *pdf) const {
+    Spectrum f = bxdf->Sample_f(wo, wi, u1, u2, pdf);
+    return f;
 }
 
 Fresnel::~Fresnel() { }

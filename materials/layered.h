@@ -33,10 +33,14 @@ class LayeredMaterial : public Material {
 public:
     // LayeredMaterial Public Methods
     LayeredMaterial(const Reference<Material> &mat1, const Reference<Material> &mat2,
-                const Reference<Texture<Spectrum> > &sc) {
+                const Reference<Texture<float> > &ior_,
+                const Reference<Texture<float> > &d,
+                const Reference<Texture<Spectrum> > &a) {
         m1 = mat1;
         m2 = mat2;
-        scale = sc;
+        ior = ior_;
+        thickness = d;
+        absorption = a;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,
@@ -44,11 +48,9 @@ public:
 private:
     // LayeredMaterial Private Data
     Reference<Material> m1, m2;
-    Reference<Texture<Spectrum> > scale;
-    Reference<Texture<Spectrum> > absorption;
+    Reference<Texture<float> > 	ior;
     Reference<Texture<float> > 	thickness;
-    Reference<Texture<float> > 	ior1;
-    Reference<Texture<float> > 	ior2;
+    Reference<Texture<Spectrum> > absorption;
 };
 
 
