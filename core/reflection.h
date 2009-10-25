@@ -39,9 +39,10 @@ Spectrum FrCond(float cosi, const Spectrum &n, const Spectrum &k);
 Spectrum FresnelApproxEta(const Spectrum &intensity);
 Spectrum FresnelApproxK(const Spectrum &intensity);
 Point BRDFRemap(const Vector &wo, const Vector &wi);
-struct ThetaPhiSample {
-    ThetaPhiSample(const Point &pp, const Spectrum &vv) : p(pp), v(vv) { }
-    ThetaPhiSample() { }
+struct IrregIsotropicBRDFSample {
+    IrregIsotropicBRDFSample(const Point &pp, const Spectrum &vv)
+        : p(pp), v(vv) { }
+    IrregIsotropicBRDFSample() { }
     Point p;
     Spectrum v;
 };
@@ -61,13 +62,13 @@ inline float Fdr(float eta) {
 // BSDF Inline Functions
 inline float CosTheta(const Vector &w) { return w.z; }
 inline float AbsCosTheta(const Vector &w) { return fabsf(w.z); }
-inline float SinTheta(const Vector &w) {
-    return sqrtf(max(0.f, 1.f - w.z*w.z));
+inline float SinTheta2(const Vector &w) {
+    return 1.f - CosTheta(w)*CosTheta(w);
 }
 
 
-inline float SinTheta2(const Vector &w) {
-    return 1.f - CosTheta(w)*CosTheta(w);
+inline float SinTheta(const Vector &w) {
+    return sqrtf(SinTheta2(w));
 }
 
 
@@ -175,9 +176,6 @@ public:
     inline void Add(BxDF *bxdf);
     int NumComponents() const { return nBxDFs; }
     int NumComponents(BxDFType flags) const;
-    bool HasShadingGeometry() const {
-        return (nn.x != ng.x || nn.y != ng.y || nn.z != ng.z);
-    }
     Vector WorldToLocal(const Vector &v) const {
         return Vector(Dot(v, sn), Dot(v, tn), Dot(v, nn));
     }
@@ -186,11 +184,11 @@ public:
                       sn.y * v.x + tn.y * v.y + nn.y * v.z,
                       sn.z * v.x + tn.z * v.y + nn.z * v.z);
     }
-    Spectrum f(const Vector &woW, const Vector &wiW,
-        BxDFType flags = BSDF_ALL) const;
+    Spectrum f(const Vector &woW, const Vector &wiW, BxDFType flags = BSDF_ALL) const;
     Spectrum rho(int nSamples, const float *samples1,
-        const float *samples2, BxDFType flags = BSDF_ALL) const;
-    Spectrum rho(const Vector &wo, int nSamples, const float *samples, BxDFType flags = BSDF_ALL) const;
+                 const float *samples2, BxDFType flags = BSDF_ALL) const;
+    Spectrum rho(const Vector &wo, int nSamples, const float *samples,
+                 BxDFType flags = BSDF_ALL) const;
 
     // BSDF Public Data
     const DifferentialGeometry dgShading;
@@ -223,8 +221,8 @@ public:
         return (type & flags) == type;
     }
     virtual Spectrum f(const Vector &wo, const Vector &wi) const = 0;
-    virtual Spectrum Sample_f(const Vector &wo, Vector *wi,
-        float u1, float u2, float *pdf) const;
+    virtual Spectrum Sample_f(const Vector &wo, Vector *wi, float u1, float u2,
+        float *pdf) const;
     virtual Spectrum rho(const Vector &wo, int nSamples, const float *samples) const;
     virtual Spectrum rho(int nSamples, const float *samples1,
         const float *samples2) const;
@@ -249,7 +247,7 @@ public:
         return brdf->rho(otherHemisphere(w), nSamples, samples);
     }
     Spectrum rho(int nSamples, const float *samples1,
-        const float *samples2) const {
+                 const float *samples2) const {
         return brdf->rho(nSamples, samples1, samples2);
     }
     Spectrum f(const Vector &wo, const Vector &wi) const;
@@ -331,7 +329,6 @@ public:
         : eta(e), k(kk) {
     }
 private:
-    // FresnelConductor Private Data
     Spectrum eta, k;
 };
 
@@ -345,7 +342,6 @@ public:
         eta_t = et;
     }
 private:
-    // FresnelDielectric Private Data
     float eta_i, eta_t;
 };
 
@@ -482,9 +478,7 @@ public:
     // Blinn Public Methods
     float D(const Vector &wh) const {
         float costhetah = AbsCosTheta(wh);
-        return (exponent+2) * INV_TWOPI *
-    //           powf(max(0.f, costhetah), exponent);
-               powf(costhetah, exponent);
+        return (exponent+2) * INV_TWOPI * powf(costhetah, exponent);
     }
     virtual void Sample_f(const Vector &wi, Vector *sampled_f, float u1, float u2, float *pdf) const;
     virtual float Pdf(const Vector &wi, const Vector &wo) const;
@@ -506,7 +500,7 @@ public:
         float d = 1.f - costhetah * costhetah;
         if (d == 0.f) return 0.f;
         float e = (ex * wh.x * wh.x + ey * wh.y * wh.y) / d;
-        return sqrtf((ex+1)*(ey+1)) * INV_TWOPI * powf(costhetah, e);
+        return sqrtf((ex+1.f) * (ey+1.f)) * INV_TWOPI * powf(costhetah, e);
     }
     void Sample_f(const Vector &wo, Vector *wi, float u1, float u2, float *pdf) const;
     float Pdf(const Vector &wo, const Vector &wi) const;
@@ -535,27 +529,29 @@ private:
 };
 
 
-class ThetaPhiMeasuredBRDF : public BxDF {
+class IrregIsotropicBRDF : public BxDF {
 public:
-    // ThetaPhiMeasuredBRDF Public Methods
-    ThetaPhiMeasuredBRDF(const KdTree<ThetaPhiSample> *tpd)
-        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_GLOSSY)), thetaPhiData(tpd) { }
+    // IrregIsotropicBRDF Public Methods
+    IrregIsotropicBRDF(const KdTree<IrregIsotropicBRDFSample> *d)
+        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_GLOSSY)), isoBRDFData(d) { }
     Spectrum f(const Vector &wo, const Vector &wi) const;
 private:
-    // ThetaPhiMeasuredBRDF Private Data
-    const KdTree<ThetaPhiSample> *thetaPhiData;
+    // IrregIsotropicBRDF Private Data
+    const KdTree<IrregIsotropicBRDFSample> *isoBRDFData;
 };
 
 
-class MERLMeasuredBRDF : public BxDF {
+class RegularHalfangleBRDF : public BxDF {
 public:
-    // MERLMeasuredBRDF Public Methods
-    MERLMeasuredBRDF(const float *d)
-        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_GLOSSY)), brdf(d) { }
+    // RegularHalfangleBRDF Public Methods
+    RegularHalfangleBRDF(const float *d, int nth, int ntd, int npd)
+        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_GLOSSY)), brdf(d),
+          nThetaH(nth), nThetaD(ntd), nPhiD(npd) { }
     Spectrum f(const Vector &wo, const Vector &wi) const;
 private:
-    // MERLMeasuredBRDF Private Data
+    // RegularHalfangleBRDF Private Data
     const float *brdf;
+    int nThetaH, nThetaD, nPhiD;
 };
 
 
