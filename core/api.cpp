@@ -371,7 +371,7 @@ Reference<Material> MakeMaterial(const string &name,
             mat2 = MakeMaterial("matte", curTransform[0], mp);
         }
 
-        material = CreateMixMaterial(mtl2world, mp, mat1, mat2);
+        material = CreateLayeredMaterial(mtl2world, mp, mat1, mat2);
     }
     else if (name == "mix") {
         string m1 = mp.FindString("namedmaterial1", "");
