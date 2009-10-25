@@ -39,7 +39,7 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     BSDF *b1 = m1->GetBSDF(dgGeom, dgShading, arena); // m1: coating layer
     BSDF *b2 = m2->GetBSDF(dgGeom, dgShading, arena); // m2: base layer
 
-    float eta_i = 1.0; //ior1->Evaluate(dgs); // air
+    float eta_i = 1.0; // air
     float eta_t = ior->Evaluate(dgShading); // coating
 
     Fresnel *f12 = BSDF_ALLOC(arena, FresnelDielectric)(eta_i, eta_t);
@@ -62,7 +62,7 @@ LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
         const Reference<Material> &m2) {
     Reference<Texture<float> > ior = mp.GetFloatTexture("ior", float(1.5f)); // ior of m1: default 1.5 for glass
     Reference<Texture<float> > d = mp.GetFloatTexture("thickness", float(1.0f));
-    Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.5f));
+    Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.1));
     return new LayeredMaterial(m1, m2, ior, d, a);
 }
 
