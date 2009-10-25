@@ -99,10 +99,10 @@ inline Vector SnellDir(const Vector &w, float etai, float etat) {
     float sint2 = eta * eta * sini2;
 
     // Handle total internal reflection for transmission
+    if (sint2 >= 1.) Assert("TIR"); //return 0.;
     float cost = sqrtf(max(0.f, 1.f - sint2));
-    if (entering) cost = -cost;
     float sintOverSini = eta;
-
+	
 	return Vector(sintOverSini * -w.x, sintOverSini * -w.y, cost);
 }
 
@@ -292,20 +292,22 @@ public:
 class LayeredBxDF : public BxDF {
 public:
     // LayeredBxDF Public Methods
-    LayeredBxDF(BxDF *b, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float etai, float etat)
+    LayeredBxDF(BxDF *b, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float eta_i, float eta_t)
         : BxDF(BxDFType(b->type)) {
         bxdf = b;
-	f12 = fresnel_12;
-	f21 = fresnel_21;
-	alpha = absorption; //absorption
-	depth = thickness; // thickness
+		f12 = fresnel_12;
+		f21 = fresnel_21;
+		alpha = absorption; //absorption
+		depth = thickness; // thickness
+		etai = eta_i;
+		etat = eta_t;
     }
     Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
-        return s * bxdf->rho(w, nSamples, samples);
+        return bxdf->rho(w, nSamples, samples);
     }
     Spectrum rho(int nSamples, const float *samples1,
         const float *samples2) const {
-        return s * bxdf->rho(nSamples, samples1, samples2);
+        return bxdf->rho(nSamples, samples1, samples2);
     }
     Spectrum f(const Vector &wo, const Vector &wi) const;
     Spectrum Sample_f(const Vector &wo, Vector *wi,
@@ -313,7 +315,6 @@ public:
 private:
 	Vector wir, wor; // refracted direction of wi and wo in the coating layer, respectively
     BxDF *bxdf;
-    Spectrum s; // TODO: delete this line
     Fresnel *f12,*f21;
     Spectrum alpha; //absorption
     float depth; //thickness

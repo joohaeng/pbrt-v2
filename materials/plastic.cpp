@@ -42,7 +42,8 @@ BSDF *PlasticMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     BSDF *bsdf = BSDF_ALLOC(arena, BSDF)(dgs, dgGeom.nn);
     Spectrum kd = Kd->Evaluate(dgs).Clamp();
     BxDF *diff = BSDF_ALLOC(arena, Lambertian)(kd);
-    Fresnel *fresnel = BSDF_ALLOC(arena, FresnelDielectric)(1.5f, 1.f);
+    //Fresnel *fresnel = BSDF_ALLOC(arena, FresnelDielectric)(1.5f, 1.f);
+    Fresnel *fresnel = BSDF_ALLOC(arena, FresnelDielectric)(1.f, 1.5f);
     Spectrum ks = Ks->Evaluate(dgs).Clamp();
     float rough = roughness->Evaluate(dgs);
     BxDF *spec = BSDF_ALLOC(arena, Microfacet)
