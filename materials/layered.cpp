@@ -42,6 +42,8 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     float eta_i = 1.0; // air
     float eta_t = ior->Evaluate(dgShading); // coating
 
+    bool doTIR = (tir->Evaluate(dgShading)==1.0f ? true: false); // TIR flag
+
     Fresnel *f12 = BSDF_ALLOC(arena, FresnelDielectric)(eta_i, eta_t);
     Fresnel *f21 = BSDF_ALLOC(arena, FresnelDielectric)(eta_t, eta_i);
 
@@ -50,10 +52,16 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
 
     // Create a layered material on top of base b2 considering the paramters of coating b1: Fresnel, absorption, depth
     int n2 = b2->NumComponents();
+#if 1
     for (int i = 0; i < n2; ++i)
-        b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t));
-
+        b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR));
     return b1;
+#else
+	BSDF *b3 = BSDF_ALLOC(arena, BSDF)(dgShading, dgGeom.nn);
+    for (int i = 0; i < n2; ++i)
+        b3->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR));
+    return b3;
+#endif
 }
 
 
@@ -61,8 +69,9 @@ LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
         const TextureParams &mp, const Reference<Material> &m1,
         const Reference<Material> &m2) {
     Reference<Texture<float> > ior = mp.GetFloatTexture("ior", float(1.5f)); // ior of m1: default 1.5 for glass
+    Reference<Texture<float> > tir = mp.GetFloatTexture("tir", float(1.0f)); // 1.0f for TIR computation, otherwise for no consideration
     Reference<Texture<float> > d = mp.GetFloatTexture("thickness", float(1.0f));
     Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.1));
-    return new LayeredMaterial(m1, m2, ior, d, a);
+    return new LayeredMaterial(m1, m2, ior, d, a, tir);
 }
 

@@ -35,12 +35,14 @@ public:
     LayeredMaterial(const Reference<Material> &mat1, const Reference<Material> &mat2,
                 const Reference<Texture<float> > &ior_,
                 const Reference<Texture<float> > &d,
-                const Reference<Texture<Spectrum> > &a) {
+                const Reference<Texture<Spectrum> > &a,
+                const Reference<Texture<float> > &tir_) {
         m1 = mat1;
         m2 = mat2;
         ior = ior_;
         thickness = d;
         absorption = a;
+        tir = tir_;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,
@@ -49,6 +51,7 @@ private:
     // LayeredMaterial Private Data
     Reference<Material> m1, m2;
     Reference<Texture<float> > 	ior;
+    Reference<Texture<float> > 	tir; // 1 for TIR computation, otherwise for no consideration.
     Reference<Texture<float> > 	thickness;
     Reference<Texture<Spectrum> > absorption;
 };

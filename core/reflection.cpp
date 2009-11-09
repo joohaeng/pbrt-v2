@@ -96,19 +96,59 @@ Spectrum ScaledBxDF::Sample_f(const Vector &wo, Vector *wi,
     return s * f;
 }
 
+inline Vector SnellDir(const Vector &w, float etai, float etat) {
+
+    // Compute transmitted ray direction
+    float sini2 = SinTheta2(w);
+    float eta = etai / etat;
+    float sint2 = eta * eta * sini2;
+
+    // Handle total internal reflection for transmission
+    //if (sint2 >= 1.) Assert("TIR"); //return 0.;
+    float cost = sqrtf(max(0.f, 1.f - sint2));
+	
+	return Vector(eta * w.x, eta * w.y, cost);
+}
+
+inline float G(const Vector &wo, const Vector &wi, const Vector &wh) {
+    float NdotWh = AbsCosTheta(wh);
+    float NdotWo = AbsCosTheta(wo);
+    float NdotWi = AbsCosTheta(wi);
+    float WOdotWh = AbsDot(wo, wh);
+	//Info("%f, %f, %f, %f", NdotWh, NdotWo, NdotWi, WOdotWh);
+    return min(1.f, min((2.f * NdotWh * NdotWo / WOdotWh), (2.f * NdotWh * NdotWi / WOdotWh)));
+}
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 	// wor, wir: refracted direction of wi and wo in the coating layer, respectively
-	Vector wor = Normalize(SnellDir(wo, etai, etat));
-	Vector wir = Normalize(SnellDir(wi, etai, etat));
+	Vector wor = SnellDir(wo, etai, etat);
+	//Info("(%f, %f, %f)->(%f, %f, %f)", wo.x, wo.y, wo.z, wor.x, wor.y, wor.z);
+	Vector wir = SnellDir(wi, etai, etat);
     Vector whr = Normalize(wir + wor);
 
 	float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
 	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : Spectrum(1.));
 
 	float g = G(wor, wir, whr);
-	Spectrum t = (Spectrum(1.f - g)) + (Spectrum(1.f) - f21->Evaluate(CosTheta(wor))) * g;
+	//Info("g: %f", g);
+	//float g = G(wo, wi, Normalize(wi+wo));
+	Spectrum t = Spectrum(1.f) - f21->Evaluate(CosTheta(wor));
+	if ( tir ) t = Spectrum(1.f - g) + (t * g);
+	//Info("t: %d", tir);
+	//t = Spectrum(1.f - g) + (t * g);
+	//float c[3];
+	//t.ToRGB(c);
+	//Info("%f %f %f", c[0], c[1], c[2]);
 
     return (Spectrum(1.f) - f12->Evaluate(CosTheta(wi))) * bxdf->f(wor, wir) * a * t;
+	//return t;
+	//return Spectrum(1.f-g);
+	//return Spectrum(g);
+	//return Spectrum(1.f);
+	//float c[3] = {fabs(wi.x), fabs(wi.y), fabs(wi.z)};
+	//float c[3] = {fabs(wo.x), fabs(wo.y), fabs(wo.z)};
+	//float c[3] = {fabs(wir.x), fabs(wir.y), fabs(wir.z)};
+	//float c[3] = {fabs(wor.x), fabs(wor.y), fabs(wor.z)};
+	//return Spectrum::FromRGB(c);
 }
 
 Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,

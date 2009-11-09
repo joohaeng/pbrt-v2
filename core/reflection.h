@@ -86,33 +86,6 @@ inline bool SameHemisphere(const Vector &w, const Vector &wp) {
     return w.z * wp.z > 0.f;
 }
 
-inline Vector SnellDir(const Vector &w, float etai, float etat) {
-    // Figure out which $\eta$ is incident and which is transmitted
-    bool entering = CosTheta(w) > 0.;
-    float ei = etai, et = etat;
-    if (!entering)
-        swap(ei, et);
-
-    // Compute transmitted ray direction
-    float sini2 = SinTheta2(w);
-    float eta = ei / et;
-    float sint2 = eta * eta * sini2;
-
-    // Handle total internal reflection for transmission
-    if (sint2 >= 1.) Assert("TIR"); //return 0.;
-    float cost = sqrtf(max(0.f, 1.f - sint2));
-    float sintOverSini = eta;
-	
-	return Vector(sintOverSini * -w.x, sintOverSini * -w.y, cost);
-}
-
-inline float G(const Vector &wo, const Vector &wi, const Vector &wh) {
-    float NdotWh = AbsCosTheta(wh);
-    float NdotWo = AbsCosTheta(wo);
-    float NdotWi = AbsCosTheta(wi);
-    float WOdotWh = AbsDot(wo, wh);
-    return min(1.f, min((2.f * NdotWh * NdotWo / WOdotWh), (2.f * NdotWh * NdotWi / WOdotWh)));
-}
 
 // BSDF Declarations
 enum BxDFType {
@@ -292,8 +265,11 @@ public:
 class LayeredBxDF : public BxDF {
 public:
     // LayeredBxDF Public Methods
-    LayeredBxDF(BxDF *b, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float eta_i, float eta_t)
-        : BxDF(BxDFType(b->type)) {
+    LayeredBxDF(BxDF *b, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float eta_i, float eta_t, bool doTIR)
+        : BxDF(BxDFType(b->type)), bxdf(b), f12(fresnel_12), f21(fresnel_21),
+			alpha(absorption), depth(thickness), etai(eta_i), etat(eta_t), tir(doTIR)
+	{
+	/*
         bxdf = b;
 		f12 = fresnel_12;
 		f21 = fresnel_21;
@@ -301,6 +277,7 @@ public:
 		depth = thickness; // thickness
 		etai = eta_i;
 		etat = eta_t;
+	*/
     }
     Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
         return bxdf->rho(w, nSamples, samples);
@@ -319,7 +296,7 @@ private:
     Spectrum alpha; //absorption
     float depth; //thickness
 	float etai, etat;
-
+	bool tir;
 };
 
 class FresnelConductor : public Fresnel {

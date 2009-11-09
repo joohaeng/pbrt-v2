@@ -11,14 +11,15 @@ EXRINCLUDE=-I/opt/local/include/OpenEXR -I/opt/include/OpenEXR
 EXRLIBDIR=-L/opt/local/lib
 
 DEFS=-DPBRT_STATS_NONE -DPBRT_HAS_PTHREADS -DPBRT_HAS_OPENEXR
+DEFS+= -DNDEBUG
 
 # 32 bit
-DEFS+=-DPBRT_POINTER_SIZE=4
-MARCH=-m32
+#DEFS+=-DPBRT_POINTER_SIZE=4
+#MARCH=-m32
 
 # 64 bit
-#DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
-#MARCH=-m64
+DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
+MARCH=-m64
 
 #########################################################################
  
