@@ -34,8 +34,8 @@ struct Intersection {
     // Intersection Public Methods
     Intersection() {
         primitive = NULL;
-        ShapeId = PrimitiveId = 0;
-        RayEpsilon = 0.f;
+        shapeId = primitiveId = 0;
+        rayEpsilon = 0.f;
     }
     BSDF *GetBSDF(const RayDifferential &ray, MemoryArena &arena) const;
     BSSRDF *GetBSSRDF(const RayDifferential &ray, MemoryArena &arena) const;
@@ -45,8 +45,8 @@ struct Intersection {
     DifferentialGeometry dg;
     const Primitive *primitive;
     Transform WorldToObject, ObjectToWorld;
-    uint32_t ShapeId, PrimitiveId;
-    float RayEpsilon;
+    uint32_t shapeId, primitiveId;
+    float rayEpsilon;
 private:
     // Intersection Private Methods
     Intersection(const Intersection &);

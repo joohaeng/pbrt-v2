@@ -127,20 +127,20 @@ struct PathSample {
 
 
 
-#define MAX_DEPTH 10
 struct MLTSample {
+    MLTSample(int maxDepth) { pathSamples.resize(maxDepth); }
     CameraSample cameraSample;
-    PathSample pathSamples[MAX_DEPTH];
+    vector<PathSample> pathSamples;
 };
 
 
 static void LargeStep(RNG &rng, MLTSample *sample, int maxDepth,
         int x0, int x1, int y0, int y1, float t0, float t1) {
-    sample->cameraSample.ImageX = Lerp(rng.RandomFloat(), x0, x1);
-    sample->cameraSample.ImageY = Lerp(rng.RandomFloat(), y0, y1);
-    sample->cameraSample.Time = Lerp(rng.RandomFloat(), t0, t1);
-    sample->cameraSample.LensU = rng.RandomFloat();
-    sample->cameraSample.LensV = rng.RandomFloat();
+    sample->cameraSample.imageX = Lerp(rng.RandomFloat(), x0, x1);
+    sample->cameraSample.imageY = Lerp(rng.RandomFloat(), y0, y1);
+    sample->cameraSample.time = Lerp(rng.RandomFloat(), t0, t1);
+    sample->cameraSample.lensU = rng.RandomFloat();
+    sample->cameraSample.lensV = rng.RandomFloat();
     for (int i = 0; i < maxDepth; ++i) {
         PathSample &ps = sample->pathSamples[i];
         ps.bsdfComponent = rng.RandomFloat();
@@ -177,11 +177,11 @@ static inline void mutate(RNG &rng, float *v, float min = 0.f, float max = 1.f) 
 
 static void SmallStep(RNG &rng, MLTSample *sample, int maxDepth,
         int x0, int x1, int y0, int y1, float t0, float t1) {
-    mutate(rng, &sample->cameraSample.ImageX, x0, x1);
-    mutate(rng, &sample->cameraSample.ImageY, y0, y1);
-    mutate(rng, &sample->cameraSample.Time, t0, t1);
-    mutate(rng, &sample->cameraSample.LensU);
-    mutate(rng, &sample->cameraSample.LensV);
+    mutate(rng, &sample->cameraSample.imageX, x0, x1);
+    mutate(rng, &sample->cameraSample.imageY, y0, y1);
+    mutate(rng, &sample->cameraSample.time, t0, t1);
+    mutate(rng, &sample->cameraSample.lensU);
+    mutate(rng, &sample->cameraSample.lensV);
     for (int i = 0; i < maxDepth; ++i) {
         PathSample &ps = sample->pathSamples[i];
         mutate(rng, &ps.bsdfComponent);
@@ -226,8 +226,8 @@ MetropolisRenderer::MetropolisRenderer(int ts, int perPixelSamples,
     directPixelSamples = dps;
     largeStepProbability = lsp;
     doDirectSeparately = dds;
+    maxDepth = md;
     maxConsecutiveRejects = mr;
-    maxDepth = min(md, MAX_DEPTH);
     indirectOnly = io;
     nSamplesFinished = 0.f;
 }
@@ -269,8 +269,8 @@ void MetropolisRenderer::Render(const Scene *scene) {
     int x0, x1, y0, y1;
     camera->film->GetPixelExtent(&x0, &x1, &y0, &y1);
     int nPixels = (x1-x0) * (y1-y0);
-    float t0 = camera->ShutterOpen;
-    float t1 = camera->ShutterClose;
+    float t0 = camera->shutterOpen;
+    float t1 = camera->shutterClose;
 
     if (!indirectOnly && doDirectSeparately) {
         // Compute direct lighting before Metropolis light transport
@@ -300,9 +300,9 @@ void MetropolisRenderer::Render(const Scene *scene) {
     float sumContrib = 0.f;
     bootstrapSamples.reserve(nBootstrap);
     bool ignoreDirect = doDirectSeparately || indirectOnly;
+    MLTSample sample(maxDepth);
     for (int i = 0; i < nBootstrap; ++i) {
         // Compute contribution for random sample for MLT bootstrapping
-        MLTSample sample;
         LargeStep(rng, &sample, maxDepth, x0, x1, y0, y1, t0, t1);
         float contrib = I(L(scene, this, camera, arena, rng, maxDepth, ignoreDirect, sample), sample);
         sumContrib += contrib;
@@ -315,7 +315,7 @@ void MetropolisRenderer::Render(const Scene *scene) {
     rng.Seed(0);
     float contribOffset = rng.RandomFloat() * sumContrib;
     sumContrib = 0.f;
-    MLTSample initialSample;
+    MLTSample initialSample(maxDepth);
     for (int i = 0; i < nBootstrap; ++i) {
         LargeStep(rng, &initialSample, maxDepth, x0, x1, y0, y1, t0, t1);
         sumContrib += bootstrapSamples[i];
@@ -328,7 +328,6 @@ void MetropolisRenderer::Render(const Scene *scene) {
         nTasks = max(nTasks, 32 * NumSystemCores());
         nTasks = min(nTasks, 32768);
         nSamples = (nSamples / nTasks) * nTasks;
-        //fprintf(stderr, "Running %d MLT tasks\n", nTasks);
         ProgressReporter progress(nTasks, "Metropolis");
         vector<Task *> tasks;
         for (int i = 0; i < nTasks; ++i)
@@ -373,7 +372,7 @@ Spectrum MLTDirectIntegrator::Li(const Scene *scene,
     // Compute emitted light if ray hit an area light source
     L += isect.Le(wo);
     L += UniformSampleAllLights(scene, renderer, arena, p, n, wo,
-            isect.RayEpsilon, bsdf,
+            isect.rayEpsilon, bsdf,
             sample, lightSampleOffsets, bsdfSampleOffsets);
     return L;
 }
@@ -389,7 +388,7 @@ void MLTDirectTask::Run() {
     RNG rng(taskNum);
     // Allocate space for samples and intersections
     int maxSamples = sampler->MaximumSampleCount();
-    Sample *samples = origSample->Duplicate(maxSamples, rng);
+    Sample *samples = origSample->Duplicate(maxSamples, &rng);
     RayDifferential *rays = new RayDifferential[maxSamples];
     Spectrum *Ls = new Spectrum[maxSamples];
     Spectrum *Ts = new Spectrum[maxSamples];
@@ -489,7 +488,7 @@ void MLTTask::Run() {
     // Declare basic _MLTTask_ variables and prepare for sampling
     RNG rng(taskNum);
     MemoryArena arena;
-    MLTSample mltSamples[2];
+    vector<MLTSample> mltSamples(2, MLTSample(maxDepth));
     Spectrum sampleLs[2];
     u_int currentSample = 0, proposedSample = 1;
     mltSamples[currentSample] = initialSample;
@@ -583,7 +582,7 @@ static Spectrum L(const Scene *scene, const Renderer *renderer,
             const Light *light = scene->lights[lightNum];
             L += pathThroughput *
                  EstimateDirect(scene, renderer, arena, light, p, n, wo,
-                     isect.RayEpsilon, sample.cameraSample.Time, bsdf, &rng,
+                     isect.rayEpsilon, sample.cameraSample.time, bsdf, &rng,
                      lightSample, bsdfSample);
         }
 
@@ -599,7 +598,7 @@ static Spectrum L(const Scene *scene, const Renderer *renderer,
             break;
         specularBounce = (flags & BSDF_SPECULAR) != 0;
         pathThroughput *= f * AbsDot(wi, n) / pdf;
-        ray = RayDifferential(p, wi, ray, isect.RayEpsilon);
+        ray = RayDifferential(p, wi, ray, isect.rayEpsilon);
         
         //pathThroughput *= renderer->Transmittance(scene, ray, NULL, arena, sample->rng);
     }

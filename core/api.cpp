@@ -40,13 +40,13 @@
 #include "cameras/environment.h"
 #include "cameras/orthographic.h"
 #include "cameras/perspective.h"
-#include "cameras/realistic.h"
 #include "film/image.h"
 #include "filters/box.h"
 #include "filters/gaussian.h"
 #include "filters/mitchell.h"
 #include "filters/sinc.h"
 #include "filters/triangle.h"
+#include "integrators/ambientocclusion.h"
 #include "integrators/diffuseprt.h"
 #include "integrators/dipolesubsurface.h"
 #include "integrators/directlighting.h"
@@ -547,6 +547,8 @@ SurfaceIntegrator *MakeSurfaceIntegrator(const string &name,
         si = CreateIGISurfaceIntegrator(paramSet);
     else if (name == "dipolesubsurface")
         si = CreateDipoleSubsurfaceIntegrator(paramSet);
+    else if (name == "ambientocclusion")
+        si = CreateAmbientOcclusionIntegrator(paramSet);
     else if (name == "useprobes")
         si = CreateRadianceProbesSurfaceIntegrator(paramSet);
     else if (name == "diffuseprt")
@@ -611,8 +613,6 @@ Camera *MakeCamera(const string &name,
         camera = CreateOrthographicCamera(paramSet, animatedCam2World, film);
     else if (name == "environment")
         camera = CreateEnvironmentCamera(paramSet, animatedCam2World, film);
-    else if (name == "realistic")
-        camera = CreateRealisticCamera(paramSet, animatedCam2World, film);
     else
         Warning("Camera \"%s\" unknown.", name.c_str());
     paramSet.ReportUnused();
@@ -1219,7 +1219,7 @@ Renderer *RenderOptions::MakeRenderer() const {
     }
     // Create remaining \use{Renderer} types
     else if (RendererName == "createprobes") {
-        Point pCamera = camera->CameraToWorld(camera->ShutterOpen, Point(0, 0, 0));
+        Point pCamera = camera->CameraToWorld(camera->shutterOpen, Point(0, 0, 0));
         renderer = CreateRadianceProbesRenderer(pCamera, RendererParams);
         RendererParams.ReportUnused();
     }

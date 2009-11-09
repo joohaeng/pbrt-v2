@@ -21,34 +21,27 @@
 
  */
 
-#ifndef PBRT_CAMERAS_REALISTIC_H
-#define PBRT_CAMERAS_REALISTIC_H
+#ifndef PBRT_INTEGRATORS_AMBIENTOCCLUSION_H
+#define PBRT_INTEGRATORS_AMBIENTOCCLUSION_H
 
-// cameras/realistic.h*
+// integrators/ambientocclusion.h*
 #include "pbrt.h"
-#include "camera.h"
-#include "geometry.h"
+#include "integrator.h"
 
-// RealisticCamera Declarations
-class LensSystem;
-class RealisticCamera : public Camera {
+// AmbientOcclusionIntegrator Declarations
+class AmbientOcclusionIntegrator : public SurfaceIntegrator {
 public:
-    // RealisticCamera Public Methods
-    RealisticCamera(const AnimatedTransform &cam2world,
-        float sopen, float sclose, Film *film, float focaldistance,
-        float fstop, float filmdiagonal, float aspect, float scale,
-        const string &specfile, const string &mode, bool constantWeight);
-    ~RealisticCamera();
-    float GenerateRay(const CameraSample &sample, Ray *) const;
+    AmbientOcclusionIntegrator(int ns, float md) { nSamples = RoundUpPow2(ns); maxDist = md; }
+    Spectrum Li(const Scene *scene, const Renderer *renderer,
+        const RayDifferential &ray, const Intersection &isect,
+        const Sample *sample, MemoryArena &arena) const;
 private:
-    // RealisticCamera Private Data
-    LensSystem *lensSystem;
-    float wfilm, hfilm;
-    bool accurate, constantWeightRays;
+    int nSamples;
+    float maxDist;
 };
 
 
-RealisticCamera *CreateRealisticCamera(const ParamSet &params,
-        const AnimatedTransform &cam2world, Film *film);
 
-#endif // PBRT_CAMERAS_REALISTIC_H
+AmbientOcclusionIntegrator *CreateAmbientOcclusionIntegrator(const ParamSet &params);
+
+#endif // PBRT_INTEGRATORS_AMBIENTOCCLUSION_H
