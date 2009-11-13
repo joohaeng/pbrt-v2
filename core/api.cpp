@@ -153,7 +153,7 @@ private:
 struct RenderOptions {
     // RenderOptions Public Methods
     RenderOptions();
-    Scene *MakeScene() const;
+    Scene *MakeScene();
     Camera *MakeCamera() const;
     Renderer *MakeRenderer() const;
 
@@ -174,8 +174,8 @@ struct RenderOptions {
     string CameraName;
     ParamSet CameraParams;
     TransformSet CameraToWorld;
-    mutable vector<Light *> lights;
-    mutable vector<Reference<Primitive> > primitives;
+    vector<Light *> lights;
+    vector<Reference<Primitive> > primitives;
     mutable vector<VolumeRegion *> volumeRegions;
     map<string, vector<Reference<Primitive> > > instances;
     vector<Reference<Primitive> > *currentInstance;
@@ -265,7 +265,7 @@ static RenderOptions *renderOptions = NULL;
 static GraphicsState graphicsState;
 static vector<GraphicsState> pushedGraphicsStates;
 static vector<TransformSet> pushedTransforms;
-static vector<u_int> pushedActiveTransformBits;
+static vector<uint32_t> pushedActiveTransformBits;
 static TransformCache transformCache;
 
 // API Macros
@@ -974,8 +974,7 @@ void pbrtLightSource(const string &name, const ParamSet &params) {
     WARN_IF_ANIMATED_TRANSFORM("LightSource");
     Light *lt = MakeLight(name, curTransform[0], params);
     if (lt == NULL)
-        Error("pbrtLightSource: light type "
-              "\"%s\" unknown.", name.c_str());
+        Error("pbrtLightSource: light type \"%s\" unknown.", name.c_str());
     else
         renderOptions->lights.push_back(lt);
 }
@@ -1055,7 +1054,6 @@ void pbrtShape(const string &name, const ParamSet &params) {
     else {
         renderOptions->primitives.push_back(prim);
         if (area != NULL) {
-            // Add area light for primitive to light vector
             renderOptions->lights.push_back(area);
         }
     }
@@ -1186,7 +1184,7 @@ void pbrtWorldEnd() {
 }
 
 
-Scene *RenderOptions::MakeScene() const {
+Scene *RenderOptions::MakeScene() {
     // Initialize _volumeRegion_ from volume region(s)
     VolumeRegion *volumeRegion;
     if (volumeRegions.size() == 0)
