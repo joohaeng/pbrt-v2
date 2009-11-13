@@ -119,9 +119,8 @@ inline float G(const Vector &wo, const Vector &wi, const Vector &wh) {
     return min(1.f, min((2.f * NdotWh * NdotWo / WOdotWh), (2.f * NdotWh * NdotWi / WOdotWh)));
 }
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
-	// wor, wir: refracted direction of wi and wo in the coating layer, respectively
+	// wor, wir: refr dir of wi and wo inside a coating layer
 	Vector wor = SnellDir(wo, etai, etat);
-	//Info("(%f, %f, %f)->(%f, %f, %f)", wo.x, wo.y, wo.z, wor.x, wor.y, wor.z);
 	Vector wir = SnellDir(wi, etai, etat);
     Vector whr = Normalize(wir + wor);
 
@@ -129,26 +128,20 @@ Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : Spectrum(1.));
 
 	float g = G(wor, wir, whr);
-	//Info("g: %f", g);
-	//float g = G(wo, wi, Normalize(wi+wo));
-	Spectrum t = Spectrum(1.f) - f21->Evaluate(CosTheta(wor));
-	if ( tir ) t = Spectrum(1.f - g) + (t * g);
-	//Info("t: %d", tir);
-	//t = Spectrum(1.f - g) + (t * g);
-	//float c[3];
-	//t.ToRGB(c);
-	//Info("%f %f %f", c[0], c[1], c[2]);
 
-    return (Spectrum(1.f) - f12->Evaluate(CosTheta(wi))) * bxdf->f(wor, wir) * a * t;
+	Spectrum spectrum_1 = Spectrum(1.f);
+
+	//Spectrum t = Spectrum(1.f) - f21->Evaluate(CosTheta(wor));
+	//if ( tir ) t = Spectrum(1.f - g) + (t * g);
+	//t = Spectrum(1.f - g) + (t * g);
+	Spectrum t = f21->Evaluate(CosTheta(wor)); // wo will be computed again
+	t = spectrum_1 - ( tir ? t * g : t);
+
+    return (spectrum_1 - f12->Evaluate(CosTheta(wi))) \
+		* bxdf->f(wor, wir) * a * t;
 	//return t;
-	//return Spectrum(1.f-g);
 	//return Spectrum(g);
-	//return Spectrum(1.f);
-	//float c[3] = {fabs(wi.x), fabs(wi.y), fabs(wi.z)};
-	//float c[3] = {fabs(wo.x), fabs(wo.y), fabs(wo.z)};
-	//float c[3] = {fabs(wir.x), fabs(wir.y), fabs(wir.z)};
-	//float c[3] = {fabs(wor.x), fabs(wor.y), fabs(wor.z)};
-	//return Spectrum::FromRGB(c);
+	//return spectrum_1;
 }
 
 Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,

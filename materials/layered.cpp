@@ -42,7 +42,8 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     float eta_i = 1.0; // air
     float eta_t = ior->Evaluate(dgShading); // coating
 
-    bool doTIR = (tir->Evaluate(dgShading)==1.0f ? true: false); // TIR flag
+    bool doTIR 		= (tir->Evaluate(dgShading)==1.0f ? true: false);
+    bool doMFNormal = (mf_normal->Evaluate(dgShading)==1.0f ? true: false);
 
     Fresnel *f12 = BSDF_ALLOC(arena, FresnelDielectric)(eta_i, eta_t);
     Fresnel *f21 = BSDF_ALLOC(arena, FresnelDielectric)(eta_t, eta_i);
@@ -54,12 +55,12 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     int n2 = b2->NumComponents();
 #if 1
     for (int i = 0; i < n2; ++i)
-        b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR));
+        b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR, doMFNormal));
     return b1;
 #else
 	BSDF *b3 = BSDF_ALLOC(arena, BSDF)(dgShading, dgGeom.nn);
     for (int i = 0; i < n2; ++i)
-        b3->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR));
+        b3->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR, doMFNormal));
     return b3;
 #endif
 }
@@ -68,10 +69,14 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
 LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
         const TextureParams &mp, const Reference<Material> &m1,
         const Reference<Material> &m2) {
-    Reference<Texture<float> > ior = mp.GetFloatTexture("ior", float(1.5f)); // ior of m1: default 1.5 for glass
-    Reference<Texture<float> > tir = mp.GetFloatTexture("tir", float(1.0f)); // 1.0f for TIR computation, otherwise for no consideration
+	// ior of m1 (coating layer): default 1.5 for glass
+    Reference<Texture<float> > ior = mp.GetFloatTexture("ior", float(1.5f)); 
+	// 1.0f for TIR computation, otherwise for no consideration
+    Reference<Texture<float> > tir = mp.GetFloatTexture("tir", float(1.0f)); 
+	// 0.0f to flat normal rather than microfacet normal
+    Reference<Texture<float> > mfnormal = mp.GetFloatTexture("mfnormal", float(1.0f)); 
     Reference<Texture<float> > d = mp.GetFloatTexture("thickness", float(1.0f));
     Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.1));
-    return new LayeredMaterial(m1, m2, ior, d, a, tir);
+    return new LayeredMaterial(m1, m2, ior, d, a, tir, mfnormal);
 }
 

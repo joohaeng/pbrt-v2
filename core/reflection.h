@@ -267,17 +267,8 @@ public:
     // LayeredBxDF Public Methods
     LayeredBxDF(BxDF *b, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float eta_i, float eta_t, bool doTIR)
         : BxDF(BxDFType(b->type)), bxdf(b), f12(fresnel_12), f21(fresnel_21),
-			alpha(absorption), depth(thickness), etai(eta_i), etat(eta_t), tir(doTIR)
+			alpha(absorption), depth(thickness), etai(eta_i), etat(eta_t), tir(doTIR), mf_normal(doMFNormal)
 	{
-	/*
-        bxdf = b;
-		f12 = fresnel_12;
-		f21 = fresnel_21;
-		alpha = absorption; //absorption
-		depth = thickness; // thickness
-		etai = eta_i;
-		etat = eta_t;
-	*/
     }
     Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
         return bxdf->rho(w, nSamples, samples);
@@ -297,6 +288,7 @@ private:
     float depth; //thickness
 	float etai, etat;
 	bool tir;
+	bool mf_normal;
 };
 
 class FresnelConductor : public Fresnel {

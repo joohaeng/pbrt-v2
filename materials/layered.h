@@ -36,13 +36,15 @@ public:
                 const Reference<Texture<float> > &ior_,
                 const Reference<Texture<float> > &d,
                 const Reference<Texture<Spectrum> > &a,
-                const Reference<Texture<float> > &tir_) {
+                const Reference<Texture<float> > &tir_),
+                const Reference<Texture<float> > &mf_normal_) {
         m1 = mat1;
         m2 = mat2;
         ior = ior_;
         thickness = d;
         absorption = a;
         tir = tir_;
+        mf_normal = mf_normal_;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,
@@ -52,6 +54,7 @@ private:
     Reference<Material> m1, m2;
     Reference<Texture<float> > 	ior;
     Reference<Texture<float> > 	tir; // 1 for TIR computation, otherwise for no consideration.
+    Reference<Texture<float> > 	mf_normal; // 0 to select a surface normal rather than a MF normal
     Reference<Texture<float> > 	thickness;
     Reference<Texture<Spectrum> > absorption;
 };
