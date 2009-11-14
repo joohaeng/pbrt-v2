@@ -36,7 +36,7 @@ public:
                 const Reference<Texture<float> > &ior_,
                 const Reference<Texture<float> > &d,
                 const Reference<Texture<Spectrum> > &a,
-                const Reference<Texture<float> > &tir_),
+                const Reference<Texture<float> > &tir_,
                 const Reference<Texture<float> > &mf_normal_) {
         m1 = mat1;
         m2 = mat2;

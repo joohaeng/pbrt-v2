@@ -265,24 +265,26 @@ public:
 class LayeredBxDF : public BxDF {
 public:
     // LayeredBxDF Public Methods
-    LayeredBxDF(BxDF *b, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float eta_i, float eta_t, bool doTIR)
-        : BxDF(BxDFType(b->type)), bxdf(b), f12(fresnel_12), f21(fresnel_21),
-			alpha(absorption), depth(thickness), etai(eta_i), etat(eta_t), tir(doTIR), mf_normal(doMFNormal)
+    LayeredBxDF(BxDF *b_coating, BxDF *b_base, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float eta_i, float eta_t, bool doTIR, bool doMFNormal)
+        : BxDF(BxDFType(b_base->type)), bxdf_coating(b_coating), bxdf_base(b_base),
+			f12(fresnel_12), f21(fresnel_21), alpha(absorption), depth(thickness),
+			etai(eta_i), etat(eta_t), tir(doTIR), mf_normal(doMFNormal)
 	{
     }
     Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
-        return bxdf->rho(w, nSamples, samples);
+        return bxdf_base->rho(w, nSamples, samples);
     }
     Spectrum rho(int nSamples, const float *samples1,
         const float *samples2) const {
-        return bxdf->rho(nSamples, samples1, samples2);
+        return bxdf_base->rho(nSamples, samples1, samples2);
     }
     Spectrum f(const Vector &wo, const Vector &wi) const;
     Spectrum Sample_f(const Vector &wo, Vector *wi,
         float u1, float u2, float *pdf) const;
 private:
 	Vector wir, wor; // refracted direction of wi and wo in the coating layer, respectively
-    BxDF *bxdf;
+    BxDF *bxdf_coating;
+    BxDF *bxdf_base;
     Fresnel *f12,*f21;
     Spectrum alpha; //absorption
     float depth; //thickness

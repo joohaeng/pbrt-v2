@@ -55,7 +55,7 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     int n2 = b2->NumComponents();
 #if 1
     for (int i = 0; i < n2; ++i)
-        b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR, doMFNormal));
+        b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b1->bxdfs[0], b2->bxdfs[i], f12, f21, a, d, eta_i, eta_t, doTIR, doMFNormal));
     return b1;
 #else
 	BSDF *b3 = BSDF_ALLOC(arena, BSDF)(dgShading, dgGeom.nn);
@@ -79,4 +79,3 @@ LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
     Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.1));
     return new LayeredMaterial(m1, m2, ior, d, a, tir, mfnormal);
 }
-

@@ -66,7 +66,7 @@ struct Matrix4x4 {
             }
             fprintf(f, " ]\n");
         }
-        fprintf(f, " ] ");
+        fprintf(f, "]\n");
     }
     static Matrix4x4 Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
         Matrix4x4 r;

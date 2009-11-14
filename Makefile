@@ -59,7 +59,7 @@ LIBOBJS=$(addprefix objs/, $(subst /,_,$(LIBSRCS:.cpp=.o)))
  
 HEADERS = $(wildcard */*.h)
  
-default: bin/pbrt #tools
+default: bin/pbrt #tools/bsdftest
  
 pbrt: bin/pbrt
  
@@ -137,6 +137,10 @@ objs/pbrt.o: main/pbrt.cpp
 bin/pbrt: dirs objs/libpbrt.a objs/pbrt.o
 	@echo "Linking $@"
 	@$(CXX) $(CXXFLAGS) -o $@ objs/pbrt.o objs/libpbrt.a $(LIBS)
+
+tools/bsdftest: objs/libpbrt.a
+	@echo -n Buidling tools/bsdftest
+	@$(CXX) $(CXXFLAGS) -o $@ tools/bsdftest.cpp objs/libpbrt.a $(LIBS)
  
 core/pbrtlex.cpp: core/pbrtlex.ll core/pbrtparse.cpp
 	@echo "Lex'ing pbrtlex.ll"
