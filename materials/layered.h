@@ -33,11 +33,15 @@ class LayeredMaterial : public Material {
 public:
     // LayeredMaterial Public Methods
     LayeredMaterial(const Reference<Material> &mat1, const Reference<Material> &mat2,
-                const Reference<Texture<float> > &ior_,
+                //const Reference<Texture<float> > &ior_,
+                float ior_,
                 const Reference<Texture<float> > &d,
                 const Reference<Texture<Spectrum> > &a,
                 const Reference<Texture<float> > &tir_,
-                const Reference<Texture<float> > &mf_normal_) {
+                const Reference<Texture<float> > &mf_normal_,
+                const Reference<Texture<float> > &base_only_
+	) 
+	{
         m1 = mat1;
         m2 = mat2;
         ior = ior_;
@@ -45,6 +49,7 @@ public:
         absorption = a;
         tir = tir_;
         mf_normal = mf_normal_;
+        base_only = base_only_;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,
@@ -52,13 +57,14 @@ public:
 private:
     // LayeredMaterial Private Data
     Reference<Material> m1, m2;
-    Reference<Texture<float> > 	ior;
+    //Reference<Texture<float> > 	ior;
+    float ior;
     Reference<Texture<float> > 	tir; // 1 for TIR computation, otherwise for no consideration.
     Reference<Texture<float> > 	mf_normal; // 0 to select a surface normal rather than a MF normal
+    Reference<Texture<float> > 	base_only; // 0 to select a surface normal rather than a MF normal
     Reference<Texture<float> > 	thickness;
     Reference<Texture<Spectrum> > absorption;
 };
-
 
 LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
     const TextureParams &mp, const Reference<Material> &m1,

@@ -95,7 +95,16 @@ Spectrum ScaledBxDF::Sample_f(const Vector &wo, Vector *wi,
     Spectrum f = bxdf->Sample_f(wo, wi, u1, u2, pdf);
     return s * f;
 }
-
+inline Transform SnellTransform (const Vector &h) {
+	float angle = Degrees(SphericalTheta(h));
+	//if ( abs(h.z) == 1 ) Info("%f %f %f",h.x, h.y, h.z);
+	//Assert( abs(h.z) !=1);
+	//Assert(!isnan(angle));
+	//Assert(angle > 0);
+	Vector axis = Cross(h, Vector(0,0,1));
+	//Info("%f %f %f %f", angle, axis.x, axis.y, axis.z );
+	return Rotate(angle, axis);
+}
 inline Vector SnellDir(const Vector &w, float etai, float etat) {
 
     // Compute transmitted ray direction
@@ -105,17 +114,12 @@ inline Vector SnellDir(const Vector &w, float etai, float etat) {
 
     // Handle total internal reflection for transmission
     //if (sint2 >= 1.) Assert("TIR"); //return 0.;
+    Assert(sint2 <= 1.);
     float cost = sqrtf(max(0.f, 1.f - sint2));
 	
 	return Vector(eta * w.x, eta * w.y, cost);
 }
-
-inline Vector SnellDir(const Vector &w, float etai, float etat, const Vector &h) {
-	float angle = Degrees(SphericalTheta(h));
-	Assert(angle <= 90);
-	Assert(angle >= 0);
-	Vector axis = Cross(h, Vector(0,0,1));
-	Transform R = Rotate(angle, axis);
+inline Vector SnellDir(const Vector &w, float etai, float etat, const Transform R) {
 	Vector Rw =	R(w);
 	Vector Rwr = SnellDir(Rw, etai, etat);
 	Transform Ri = Inverse(R);
@@ -132,35 +136,48 @@ inline float G(const Vector &wo, const Vector &wi, const Vector &wh) {
 }
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 
-	// wor, wir: refr dir of wi and wo inside a coating layer
-	Vector wor, wir, whr;
-	
-	if (mf_normal) {
-		Vector wh = Normalize(wi + wo);
-		wor = SnellDir(wo, etai, etat, wh);
-		wir = SnellDir(wi, etai, etat, wh);
+	Spectrum spectrum_1 = Spectrum(1.f);
+
+	//
+	// exitant ray
+	//
+	Vector wor, wir, whr; // wor, wir: refr dir of wi and wo inside a coating layer
+	//Spectrum t;
+	Transform R;
+	Vector wh = (mf_normal ? Normalize(wi + wo) : Vector(0,0,1));
+#if 1
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+		wir = SnellDir(wi, etai, etat, R);
 	}
 	else {
+		//R = Rotate(0,Vector(0,0,1));	
 		wor = SnellDir(wo, etai, etat);
 		wir = SnellDir(wi, etai, etat);
 	}
+#endif
+	Spectrum t = f21->Evaluate(Dot(wor, wh));
+	//Spectrum t = f21->Evaluate(CosTheta(wor));
+
+	//
+	// Geometric Attenuation
+	//
 	whr = Normalize(wir + wor);
-
-	float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
-	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : Spectrum(1.));
-
 	float g = G(wor, wir, whr);
 
-	Spectrum spectrum_1 = Spectrum(1.f);
-
-	//Spectrum t = Spectrum(1.f) - f21->Evaluate(CosTheta(wor));
-	//if ( tir ) t = Spectrum(1.f - g) + (t * g);
-	//t = Spectrum(1.f - g) + (t * g);
-	Spectrum t = f21->Evaluate(CosTheta(wor)); // wo will be computed again
+	//
+	// TIR
+	//
 	t = spectrum_1 - ( tir ? t * g : t);
 
-    return (spectrum_1 - f12->Evaluate(CosTheta(wi))) \
-		* bxdf_base->f(wor, wir) * a * t;
+	//
+	// Absorbtion
+	//
+	float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
+	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
+
+    return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * bxdf_base->f(wor, wir) * a * t;
 	//return t;
 	//return Spectrum(g);
 	//return spectrum_1;
@@ -168,25 +185,128 @@ Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 
 Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
                               float u1, float u2, float *pdf) const {
-#if 0
+#define SMP_0 1
+#ifdef SMP_0
 	Vector wor = SnellDir(wo, etai, etat);
 	Vector wir;
     Spectrum f = bxdf_base->Sample_f(wor, &wir, u1, u2, pdf);
 	*wi = SnellDir(wir, etat, etai);
-#else
+#elif SMP_1
     bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
-
+#elif SMP_2
+    bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
 	Vector wor, wir;
-	if (mf_normal) {
-		Vector wh = Normalize(*wi + wo);
-		wor = SnellDir(wo, etai, etat, wh);
-		wir = SnellDir(*wi, etai, etat, wh);
+	Transform R = Rotate(0,Vector(0,0,1));	
+	Vector wh = Normalize(*wi + wo);
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+		wir = SnellDir(*wi, etai, etat, R);
 	}
 	else {
 		wor = SnellDir(wo, etai, etat);
 		wir = SnellDir(*wi, etai, etat);
 	}
     *pdf = bxdf_base->Pdf(wor, wir); // get pdf only
+#elif SMP_3
+	float pdf1, pdf2;
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	Vector wor, wir;
+	Transform R;
+	Vector wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+	}
+    bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf2);
+	if (mf_normal && wh.z < 0.999999 ) {
+		*wi = SnellDir(wir, etat, etai, R);
+	}
+	else {
+		*wi = SnellDir(wir, etat, etai);
+	}
+	//*pdf = (pdf1 + pdf2)/2.f;
+	//*pdf = pdf1 * pdf2;
+	*pdf = pdf2;
+#elif SMP_4
+    bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
+	Vector wor, wir;
+	Transform R = Rotate(0,Vector(0,0,1));	
+	Vector wh = Normalize(*wi + wo);
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+		wir = SnellDir(*wi, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+		wir = SnellDir(*wi, etai, etat);
+	}
+    float pdf2 = bxdf_base->Pdf(wor, wir); // get pdf only
+	*pdf = (*pdf + pdf2)/2.f;
+#elif SMP_5
+	float pdf1, pdf2;
+	Vector wor, wir;
+	Transform R;
+
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	Vector wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+	}
+
+    bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf2);
+	Vector whr = (mf_normal ? Normalize(wor + wir) : Vector(0,0,1));
+	if (mf_normal && whr.z < 0.999999 ) {
+		R = SnellTransform(whr);
+		*wi = SnellDir(wir, etat, etai, R);
+	}
+	else {
+		*wi = SnellDir(wir, etat, etai);
+	}
+
+	*pdf = pdf2;
+#elif SMP_6
+
+	//
+	// 3-point sampling
+	//
+
+	float pdf1, pdf2;
+	Vector wor, wir, wh;
+	Transform R;
+
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+	}
+
+    bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf2);
+
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		*wi = SnellDir(wir, etat, etai, R);
+	}
+	else {
+		*wi = SnellDir(wir, etat, etai);
+	}
+
+	*pdf = pdf2;
+
 #endif
     return this->f(wo, *wi);
 }
