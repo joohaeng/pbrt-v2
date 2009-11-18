@@ -34,17 +34,10 @@ Sampler::~Sampler() {
 
 
 Sampler::Sampler(int xstart, int xend, int ystart, int yend, int spp,
-                 float sopen, float sclose) {
-    xPixelStart = xstart;
-    xPixelEnd = xend;
-    yPixelStart = ystart;
-    yPixelEnd = yend;
-    samplesPerPixel = spp;
-    shutterOpen = sopen;
-    shutterClose = sclose;
-}
-
-
+                 float sopen, float sclose)
+    : xPixelStart(xstart), xPixelEnd(xend), yPixelStart(ystart),
+      yPixelEnd(yend), samplesPerPixel(spp), shutterOpen(sopen),
+      shutterClose(sclose) { }
 bool Sampler::ReportResults(Sample *samples, const RayDifferential *rays,
         const Spectrum *Ls, const Intersection *isects, int count) {
     return true;
@@ -113,13 +106,12 @@ void Sample::AllocateSampleMemory() {
 }
 
 
-Sample *Sample::Duplicate(int count, RNG *rng) const {
+Sample *Sample::Duplicate(int count) const {
     Sample *ret = new Sample[count];
     for (int i = 0; i < count; ++i) {
         ret[i].n1D = n1D;
         ret[i].n2D = n2D;
         ret[i].AllocateSampleMemory();
-        ret[i].rng = rng;
     }
     return ret;
 }

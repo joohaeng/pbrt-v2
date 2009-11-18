@@ -90,18 +90,18 @@ Sampler *AdaptiveSampler::GetSubSampler(int num, int count) {
 }
 
 
-int AdaptiveSampler::GetMoreSamples(Sample *samples) {
+int AdaptiveSampler::GetMoreSamples(Sample *samples, RNG &rng) {
     if (!sampleBuf)
         sampleBuf = new float[LDPixelSampleFloatsNeeded(samples, maxSamples)];
     if (supersamplePixel) {
         LDPixelSample(xPos, yPos, shutterOpen, shutterClose, maxSamples,
-                      samples, sampleBuf);
+                      samples, sampleBuf, rng);
         return maxSamples;
     }
     else {
         if (yPos == yPixelEnd) return 0;
         LDPixelSample(xPos, yPos, shutterOpen, shutterClose, minSamples,
-                      samples, sampleBuf);
+                      samples, sampleBuf, rng);
         return minSamples;
     }
 }
@@ -143,7 +143,9 @@ bool AdaptiveSampler::needsSupersampling(Sample *samples,
     case ADAPTIVE_COMPARE_SHAPE_ID:
         // See if any shape ids differ within samples
         for (int i = 0; i < count-1; ++i)
-            if (isects[i].shapeId != isects[i+1].shapeId) return true;
+            if (isects[i].shapeId != isects[i+1].shapeId &&
+                isects[i].primitiveId != isects[i+1].primitiveId)
+                return true;
         return false;
     case ADAPTIVE_CONTRAST_THRESHOLD:
         // Compare contrast of sample differences to threshold

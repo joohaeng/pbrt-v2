@@ -69,7 +69,7 @@ void AggregateTest::Render(const Scene *scene) {
 
         // Choose ray direction for testing accelerator
         Vector dir = UniformSampleSphere(rng.RandomFloat(), rng.RandomFloat());
-        if ((rng.RandomUInt() % 32) == 0) dir.x = dir.y = 0.f;
+        if ((rng.RandomUInt() % 32) == 0)      dir.x = dir.y = 0.f;
         else if ((rng.RandomUInt() % 32) == 0) dir.x = dir.z = 0.f;
         else if ((rng.RandomUInt() % 32) == 0) dir.y = dir.z = 0.f;
 
@@ -111,15 +111,15 @@ void AggregateTest::Render(const Scene *scene) {
 
 
 Spectrum AggregateTest::Li(const Scene *scene, const RayDifferential &ray,
-    const Sample *sample, MemoryArena &arena, Intersection *isect,
-    Spectrum *T) const {
+        const Sample *sample, RNG &rng, MemoryArena &arena, Intersection *isect,
+        Spectrum *T) const {
     return 0.f;
 }
 
 
 Spectrum AggregateTest::Transmittance(const Scene *scene,
-        const RayDifferential &ray,
-        const Sample *sample, MemoryArena &arena, RNG *rng) const {
+        const RayDifferential &ray, const Sample *sample, RNG &rng,
+        MemoryArena &arena) const {
     return 0.f;
 }
 

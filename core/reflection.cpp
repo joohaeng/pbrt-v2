@@ -376,7 +376,7 @@ Spectrum SpecularTransmission::Sample_f(const Vector &wo,
 
 
 Spectrum Lambertian::f(const Vector &wo, const Vector &wi) const {
-    return RoverPI;
+    return R * INV_PI;
 }
 
 
@@ -510,7 +510,7 @@ Spectrum BxDF::Sample_f(const Vector &wo, Vector *wi,
 
 
 float BxDF::Pdf(const Vector &wo, const Vector &wi) const {
-    return SameHemisphere(wo, wi) ? fabsf(wi.z) * INV_PI : 0.f;
+    return SameHemisphere(wo, wi) ? AbsCosTheta(wi) * INV_PI : 0.f;
 }
 
 
@@ -534,14 +534,34 @@ float Microfacet::Pdf(const Vector &wo, const Vector &wi) const {
 }
 
 
-void Blinn::Sample_f(const Vector &wo, Vector *wi,
-                     float u1, float u2, float *pdf) const {
-    SampleBlinn(wo, wi, u1, u2, pdf, exponent);
+void Blinn::Sample_f(const Vector &wo, Vector *wi, float u1, float u2,
+                     float *pdf) const {
+    // Compute sampled half-angle vector $\wh$ for Blinn distribution
+    float costheta = powf(u1, 1.f / (exponent+1));
+    float sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
+    float phi = u2 * 2.f * M_PI;
+    Vector wh = SphericalDirection(sintheta, costheta, phi);
+    if (!SameHemisphere(wo, wh)) wh = -wh;
+
+    // Compute incident direction by reflecting about $\wh$
+    *wi = -wo + 2.f * Dot(wo, wh) * wh;
+
+    // Compute PDF for $\wi$ from Blinn distribution
+    float blinn_pdf = ((exponent + 1.f) * powf(costheta, exponent)) /
+                      (2.f * M_PI * 4.f * Dot(wo, wh));
+    if (Dot(wo, wh) <= 0.f) blinn_pdf = 0.f;
+    *pdf = blinn_pdf;
 }
 
 
 float Blinn::Pdf(const Vector &wo, const Vector &wi) const {
-    return BlinnPdf(wo, wi, exponent);
+    Vector wh = Normalize(wo + wi);
+    float costheta = AbsCosTheta(wh);
+    // Compute PDF for $\wi$ from Blinn distribution
+    float blinn_pdf = ((exponent + 1.f) * powf(costheta, exponent)) /
+                      (2.f * M_PI * 4.f * Dot(wo, wh));
+    if (Dot(wo, wh) <= 0.f) blinn_pdf = 0.f;
+    return blinn_pdf;
 }
 
 
@@ -572,8 +592,14 @@ void Anisotropic::Sample_f(const Vector &wo, Vector *wi,
     *wi = -wo + 2.f * Dot(wo, wh) * wh;
 
     // Compute PDF for $\wi$ from anisotropic distribution
-    float anisotropic_pdf = D(wh) / (4.f * Dot(wo, wh));
-    if (Dot(wo, wh) < 0.f) anisotropic_pdf = 0.f;
+    float costhetah = AbsCosTheta(wh);
+    float ds = 1.f - costhetah * costhetah;
+    float anisotropic_pdf = 0.f;
+    if (ds > 0.f && Dot(wo, wh) > 0.f) {
+        float e = (ex * wh.x * wh.x + ey * wh.y * wh.y) / ds;
+        float d = sqrtf((ex+1.f) * (ey+1.f)) * INV_TWOPI * powf(costhetah, e);
+        anisotropic_pdf = d / (4.f * Dot(wo, wh));
+    }
     *pdf = anisotropic_pdf;
 }
 
@@ -593,10 +619,15 @@ void Anisotropic::sampleFirstQuadrant(float u1, float u2,
 
 float Anisotropic::Pdf(const Vector &wo, const Vector &wi) const {
     Vector wh = Normalize(wo + wi);
-    if (!SameHemisphere(wo, wh)) wh = -wh;
     // Compute PDF for $\wi$ from anisotropic distribution
-    float anisotropic_pdf = D(wh) / (4.f * Dot(wo, wh));
-    if (Dot(wo, wh) < 0.f) anisotropic_pdf = 0.f;
+    float costhetah = AbsCosTheta(wh);
+    float ds = 1.f - costhetah * costhetah;
+    float anisotropic_pdf = 0.f;
+    if (ds > 0.f && Dot(wo, wh) > 0.f) {
+        float e = (ex * wh.x * wh.x + ey * wh.y * wh.y) / ds;
+        float d = sqrtf((ex+1.f) * (ey+1.f)) * INV_TWOPI * powf(costhetah, e);
+        anisotropic_pdf = d / (4.f * Dot(wo, wh));
+    }
     return anisotropic_pdf;
 }
 
@@ -621,7 +652,7 @@ Spectrum FresnelBlend::Sample_f(const Vector &wo, Vector *wi,
 
 float FresnelBlend::Pdf(const Vector &wo, const Vector &wi) const {
     if (!SameHemisphere(wo, wi)) return 0.f;
-    return .5f * (fabsf(wi.z) * INV_PI + distribution->Pdf(wo, wi));
+    return .5f * (AbsCosTheta(wi) * INV_PI + distribution->Pdf(wo, wi));
 }
 
 
@@ -640,7 +671,7 @@ Spectrum BxDF::rho(const Vector &w, int nSamples,
 
 
 Spectrum BxDF::rho(int nSamples, const float *samples1,
-        const float *samples2) const {
+                   const float *samples2) const {
     Spectrum r = 0.;
     for (int i = 0; i < nSamples; ++i) {
         // Estimate one term of $\rho_\roman{hh}$
@@ -659,8 +690,8 @@ Spectrum BxDF::rho(int nSamples, const float *samples1,
 // BSDF Method Definitions
 BSDFSampleOffsets::BSDFSampleOffsets(int count, Sample *sample) {
     nSamples = count;
-    dirOffset = sample->Add2D(nSamples);
     componentOffset = sample->Add1D(nSamples);
+    dirOffset = sample->Add2D(nSamples);
 }
 
 
@@ -675,7 +706,7 @@ BSDFSample::BSDFSample(const Sample *sample,
 
 
 Spectrum BSDF::Sample_f(const Vector &wo, Vector *wi, RNG &rng, BxDFType flags,
-    BxDFType *sampledType) const {
+        BxDFType *sampledType) const {
     float pdf;
     BSDFSample bsdfSample(rng);
     Spectrum f = Sample_f(wo, wi, bsdfSample, &pdf, flags, sampledType);
@@ -715,13 +746,10 @@ Spectrum BSDF::Sample_f(const Vector &woW, Vector *wiW,
     *wiW = LocalToWorld(wi);
 
     // Compute overall PDF with all matching _BxDF_s
-    if (!(bxdf->type & BSDF_SPECULAR) && matchingComps > 1) {
-        for (int i = 0; i < nBxDFs; ++i) {
-            if (bxdfs[i] != bxdf &&
-                bxdfs[i]->MatchesFlags(flags))
+    if (!(bxdf->type & BSDF_SPECULAR) && matchingComps > 1)
+        for (int i = 0; i < nBxDFs; ++i)
+            if (bxdfs[i] != bxdf && bxdfs[i]->MatchesFlags(flags))
                 *pdf += bxdfs[i]->Pdf(wo, wi);
-        }
-    }
     if (matchingComps > 1) *pdf /= matchingComps;
 
     // Compute value of BSDF for sampled direction

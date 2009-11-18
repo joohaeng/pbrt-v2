@@ -41,9 +41,9 @@ bool VisibilityTester::Unoccluded(const Scene *scene) const {
 
 Spectrum VisibilityTester::Transmittance(const Scene *scene,
         const Renderer *renderer, const Sample *sample,
-        RNG *rng, MemoryArena &arena) const {
+        RNG &rng, MemoryArena &arena) const {
     return renderer->Transmittance(scene, RayDifferential(r), sample,
-                                   arena, rng);
+                                   rng, arena);
 }
 
 
@@ -54,13 +54,13 @@ Spectrum Light::Le(const RayDifferential &) const {
 
 LightSampleOffsets::LightSampleOffsets(int count, Sample *sample) {
     nSamples = count;
-    posOffset = sample->Add2D(nSamples);
     componentOffset = sample->Add1D(nSamples);
+    posOffset = sample->Add2D(nSamples);
 }
 
 
 LightSample::LightSample(const Sample *sample,
-        const LightSampleOffsets &offsets, uint32_t num) {
+                         const LightSampleOffsets &offsets, uint32_t num) {
     Assert(num < sample->n2D[offsets.posOffset]);
     Assert(num < sample->n1D[offsets.componentOffset]);
     uPos[0] = sample->twoD[offsets.posOffset][2*num];
@@ -132,7 +132,7 @@ ShapeSet::~ShapeSet() {
 
 
 Point ShapeSet::Sample(const Point &p, const LightSample &ls,
-        Normal *Ns) const {
+                       Normal *Ns) const {
     int sn = areaDistribution->SampleDiscrete(ls.uComponent, NULL);
     return shapes[sn]->Sample(p, ls.uPos[0], ls.uPos[1], Ns);
 }

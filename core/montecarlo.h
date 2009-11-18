@@ -62,7 +62,7 @@ struct Distribution1D {
         // Compute PDF for sampled offset
         if (pdf) *pdf = func[offset] / funcInt;
 
-        // Return $x \in [0,1]$ corresponding to sample
+        // Return $x \in [0,1)$ corresponding to sample
         return (offset + du) / count;
     }
     int SampleDiscrete(float u, float *pdf) const {
@@ -171,7 +171,8 @@ inline void GeneratePermutation(uint32_t *buf, uint32_t b, RNG &rng) {
 }
 
 
-inline double PermutedRadicalInverse(uint32_t n, uint32_t base, const uint32_t *p) {
+inline double PermutedRadicalInverse(uint32_t n, uint32_t base,
+                                     const uint32_t *p) {
     double val = 0;
     double invBase = 1. / base, invBi = invBase;
     while (n > 0) {
@@ -212,11 +213,9 @@ inline float VanDerCorput(uint32_t n, uint32_t scramble = 0);
 inline float Sobol2(uint32_t n, uint32_t scramble = 0);
 inline float LarcherPillichshammer2(uint32_t n, uint32_t scramble = 0);
 inline void Sample02(uint32_t n, uint32_t scramble[2], float sample[2]);
-int LDPixelSampleFloatsNeeded(const Sample *sample, int pixelSamples);
+int LDPixelSampleFloatsNeeded(const Sample *sample, int nPixelSamples);
 void LDPixelSample(int xPos, int yPos, float shutterOpen,
-    float shutterClose, int pixelSamples, Sample *samples, float *buf);
-void SampleBlinn(const Vector &wo, Vector *wi, float u1, float u2, float *pdf, float exponent);
-float BlinnPdf(const Vector &wo, const Vector &wi, float exponent);
+    float shutterClose, int nPixelSamples, Sample *samples, float *buf, RNG &rng);
 Vector SampleHG(const Vector &w, float g, float u1, float u2);
 float HGPdf(const Vector &w, const Vector &wp, float g);
 
@@ -267,8 +266,8 @@ LarcherPillichshammer2(uint32_t n, uint32_t scramble) {
 }
 
 
-inline void LDShuffleScrambled1D(int nSamples, int nPixel,
-        float *samples, RNG &rng) {
+inline void LDShuffleScrambled1D(int nSamples, int nPixel, float *samples,
+        RNG &rng) {
     uint32_t scramble = rng.RandomUInt();
     for (int i = 0; i < nSamples * nPixel; ++i)
         samples[i] = VanDerCorput(i, scramble);
@@ -278,8 +277,8 @@ inline void LDShuffleScrambled1D(int nSamples, int nPixel,
 }
 
 
-inline void LDShuffleScrambled2D(int nSamples,
-        int nPixel, float *samples, RNG &rng) {
+inline void LDShuffleScrambled2D(int nSamples, int nPixel, float *samples,
+        RNG &rng) {
     uint32_t scramble[2] = { rng.RandomUInt(), rng.RandomUInt() };
     for (int i = 0; i < nSamples * nPixel; ++i)
         Sample02(i, scramble, &samples[2*i]);
