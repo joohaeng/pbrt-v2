@@ -66,10 +66,9 @@ struct Matrix4x4 {
             }
             fprintf(f, " ]\n");
         }
-        fprintf(f, " ] ");
+        fprintf(f, "]\n");
     }
-    static Matrix4x4
-    Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
+    static Matrix4x4 Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
         Matrix4x4 r;
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j)
@@ -114,8 +113,8 @@ public:
         return t.m != m || t.mInv != mInv;
     }
     bool operator<(const Transform &t2) const {
-        for (u_int i = 0; i < 4; ++i)
-            for (u_int j = 0; j < 4; ++j) {
+        for (uint32_t i = 0; i < 4; ++i)
+            for (uint32_t j = 0; j < 4; ++j) {
                 if (m.m[i][j] < t2.m.m[i][j]) return true;
                 if (m.m[i][j] > t2.m.m[i][j]) return false;
             }
@@ -170,7 +169,7 @@ Transform RotateZ(float angle);
 Transform Rotate(float angle, const Vector &axis);
 Transform LookAt(const Point &pos, const Point &look, const Vector &up);
 bool SolveLinearSystem2x2(const float A[2][2], const float B[2],
-    float x[2]);
+    float *x0, float *x1);
 Transform Orthographic(float znear, float zfar);
 Transform Perspective(float fov, float znear, float zfar);
 
@@ -181,7 +180,6 @@ inline Point Transform::operator()(const Point &pt) const {
     float yp = m.m[1][0]*x + m.m[1][1]*y + m.m[1][2]*z + m.m[1][3];
     float zp = m.m[2][0]*x + m.m[2][1]*y + m.m[2][2]*z + m.m[2][3];
     float wp = m.m[3][0]*x + m.m[3][1]*y + m.m[3][2]*z + m.m[3][3];
-
     Assert(wp != 0);
     if (wp == 1.) return Point(xp, yp, zp);
     else          return Point(xp, yp, zp)/wp;
@@ -237,19 +235,14 @@ inline void Transform::operator()(const Normal &n,
 
 
 inline Ray Transform::operator()(const Ray &r) const {
-    Ray ret;
-    (*this)(r.o, &ret.o);
-    (*this)(r.d, &ret.d);
-    ret.mint = r.mint;
-    ret.maxt = r.maxt;
-    ret.time = r.time;
-    ret.depth = r.depth;
+    Ray ret = r;
+    (*this)(ret.o, &ret.o);
+    (*this)(ret.d, &ret.d);
     return ret;
 }
 
 
-inline void Transform::operator()(const Ray &r,
-                                  Ray *rt) const {
+inline void Transform::operator()(const Ray &r, Ray *rt) const {
     (*this)(r.o, &rt->o);
     (*this)(r.d, &rt->d);
     if (rt != &r) {
@@ -264,6 +257,7 @@ inline void Transform::operator()(const Ray &r,
 
 inline void Transform::operator()(const RayDifferential &r, RayDifferential *rt) const {
     (*this)(Ray(r), rt);
+    rt->hasDifferentials = r.hasDifferentials;
     (*this)(r.rxOrigin, &rt->rxOrigin);
     (*this)(r.ryOrigin, &rt->ryOrigin);
     (*this)(r.rxDirection, &rt->rxDirection);
@@ -275,6 +269,7 @@ inline void Transform::operator()(const RayDifferential &r, RayDifferential *rt)
 inline RayDifferential Transform::operator()(const RayDifferential &r) const {
     RayDifferential ret;
     (*this)(Ray(r), &ret);
+    ret.hasDifferentials = r.hasDifferentials;
     (*this)(r.rxOrigin, &ret.rxOrigin);
     (*this)(r.ryOrigin, &ret.ryOrigin);
     (*this)(r.rxDirection, &ret.rxDirection);

@@ -51,14 +51,13 @@ public:
     }
     virtual float Area() const;
     virtual Point Sample(float u1, float u2, Normal *Ns) const {
-        Severe("Unimplemented Shape::Sample method called");
+        Severe("Unimplemented Shape::Sample() method called");
         return Point();
     }
     virtual float Pdf(const Point &Pshape) const {
         return 1.f / Area();
     }
-    virtual Point Sample(const Point &P, float u1, float u2,
-                         Normal *Ns) const {
+    virtual Point Sample(const Point &P, float u1, float u2, Normal *Ns) const {
         return Sample(u1, u2, Ns);
     }
     virtual float Pdf(const Point &p, const Vector &wi) const;
@@ -66,8 +65,8 @@ public:
     // Shape Public Data
     const Transform *ObjectToWorld, *WorldToObject;
     const bool ReverseOrientation, TransformSwapsHandedness;
-    const uint32_t ShapeId;
-    static uint32_t nextShapeId;
+    const uint32_t shapeId;
+    static uint32_t nextshapeId;
 };
 
 

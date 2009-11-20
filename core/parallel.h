@@ -273,9 +273,9 @@ public:
     // Semaphore Public Methods
     Semaphore();
     ~Semaphore();
+    void Post(int count = 1);
     void Wait();
     bool TryWait();
-    void Post(int count = 1);
 private:
     // Semaphore Private Data
 #ifdef PBRT_HAS_PTHREADS
@@ -305,7 +305,7 @@ private:
 #endif // PBRT_HAS_PTHREADS
 #ifdef WIN32
     // Count of the number of waiters.
-    u_int waitersCount;
+    uint32_t waitersCount;
     // Serialize access to <waitersCount>.
     CRITICAL_SECTION waitersCountMutex, conditionMutex;
     // Signal and broadcast event HANDLEs.
@@ -315,6 +315,8 @@ private:
 };
 
 
+void TasksInit();
+void TasksCleanup();
 class Task {
 public:
     virtual ~Task();
@@ -322,12 +324,8 @@ public:
 };
 
 
-void TasksInit();
-void TasksCleanup();
 void EnqueueTasks(const vector<Task *> &tasks);
 void WaitForAllTasks();
-void TasksInit();
-void TasksCleanup();
 int NumSystemCores();
 
 #endif // PBRT_CORE_PARALLEL_H

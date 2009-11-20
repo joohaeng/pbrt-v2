@@ -32,30 +32,30 @@
 class AdaptiveSampler : public Sampler {
 public:
     // AdaptiveSampler Public Methods
-    AdaptiveSampler(int xstart, int xend,
-              int ystart, int yend,
-              int minSamples, int maxSamples, float sopen, float sclose);
+    AdaptiveSampler(int xstart, int xend, int ystart, int yend,
+        int minSamples, int maxSamples, const string &method,
+        float sopen, float sclose);
     Sampler *GetSubSampler(int num, int count);
     ~AdaptiveSampler();
     int RoundSize(int size) const {
         return RoundUpPow2(size);
     }
     int MaximumSampleCount() { return maxSamples; }
-    int GetMoreSamples(Sample *sample);
+    int GetMoreSamples(Sample *sample, RNG &rng);
     bool ReportResults(Sample *samples, const RayDifferential *rays,
-            const Spectrum *Ls, const Intersection *isects,
-            int count);
+        const Spectrum *Ls, const Intersection *isects, int count);
 private:
     // AdaptiveSampler Private Methods
     bool needsSupersampling(Sample *samples, const RayDifferential *rays,
-            const Spectrum *Ls, const Intersection *isects,
-            int count);
+        const Spectrum *Ls, const Intersection *isects, int count);
 
     // AdaptiveSampler Private Data
     int xPos, yPos;
-    bool superSamplePixel;
     int minSamples, maxSamples;
     float *sampleBuf;
+    enum AdaptiveTest { ADAPTIVE_COMPARE_SHAPE_ID, ADAPTIVE_CONTRAST_THRESHOLD };
+    AdaptiveTest method;
+    bool supersamplePixel;
 };
 
 

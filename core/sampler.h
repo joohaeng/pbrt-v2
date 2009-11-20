@@ -37,18 +37,17 @@ public:
     virtual ~Sampler();
     Sampler(int xstart, int xend, int ystart, int yend,
             int spp, float sopen, float sclose);
+    virtual int GetMoreSamples(Sample *sample, RNG &rng) = 0;
     virtual int MaximumSampleCount() = 0;
-    virtual int GetMoreSamples(Sample *sample) = 0;
+    virtual bool ReportResults(Sample *samples, const RayDifferential *rays,
+        const Spectrum *Ls, const Intersection *isects, int count);
     virtual Sampler *GetSubSampler(int num, int count) = 0;
-    virtual bool ReportResults(Sample *samples,
-        const RayDifferential *rays, const Spectrum *Ls,
-        const Intersection *isects, int count);
     virtual int RoundSize(int size) const = 0;
 
     // Sampler Public Data
-    int xPixelStart, xPixelEnd, yPixelStart, yPixelEnd;
-    int SamplesPerPixel;
-    float ShutterOpen, ShutterClose;
+    const int xPixelStart, xPixelEnd, yPixelStart, yPixelEnd;
+    const int samplesPerPixel;
+    const float shutterOpen, shutterClose;
 protected:
     // Sampler Protected Methods
     void ComputeSubWindow(int num, int count, int *xstart, int *xend, int *ystart, int *yend) const;
@@ -56,10 +55,9 @@ protected:
 
 
 struct CameraSample {
-    // Camera _Sample_ Data
-    float ImageX, ImageY;
-    float LensU, LensV;
-    float Time;
+    float imageX, imageY;
+    float lensU, lensV;
+    float time;
 };
 
 
@@ -67,11 +65,11 @@ struct Sample : public CameraSample {
     // Sample Public Methods
     Sample(Sampler *sampler, SurfaceIntegrator *surf, VolumeIntegrator *vol,
         const Scene *scene);
-    u_int Add1D(u_int num) {
+    uint32_t Add1D(uint32_t num) {
         n1D.push_back(num);
         return n1D.size()-1;
     }
-    u_int Add2D(u_int num) {
+    uint32_t Add2D(uint32_t num) {
         n2D.push_back(num);
         return n2D.size()-1;
     }
@@ -81,12 +79,11 @@ struct Sample : public CameraSample {
             FreeAligned(oneD);
         }
     }
-    Sample *Duplicate(int count, RNG &rng) const;
+    Sample *Duplicate(int count) const;
 
     // Sample Public Data
-    vector<u_int> n1D, n2D;
+    vector<uint32_t> n1D, n2D;
     float **oneD, **twoD;
-    mutable RNG *rng;
 private:
     // Sample Private Methods
     void AllocateSampleMemory();

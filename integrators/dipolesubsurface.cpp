@@ -137,7 +137,7 @@ struct SubsurfaceOctreeNode {
         if (isLeaf) {
             // Init _SubsurfaceOctreeNode_ leaf from _IrradiancePoint_s
             float sumWt = 0.f;
-            u_int i;
+            uint32_t i;
             for (i = 0; i < 8; ++i) {
                 if (!ips[i]) break;
                 float wt = ips[i]->E.y();
@@ -152,8 +152,8 @@ struct SubsurfaceOctreeNode {
         else {
             // Init interior _SubsurfaceOctreeNode_
             float sumWt = 0.f;
-            u_int nChildren = 0;
-            for (u_int i = 0; i < 8; ++i) {
+            uint32_t nChildren = 0;
+            for (uint32_t i = 0; i < 8; ++i) {
                 if (!children[i]) continue;
                 ++nChildren;
                 children[i]->InitHierarchy();
@@ -221,10 +221,10 @@ DipoleSubsurfaceIntegrator::~DipoleSubsurfaceIntegrator() {
 void DipoleSubsurfaceIntegrator::RequestSamples(Sampler *sampler, Sample *sample,
         const Scene *scene) {
     // Allocate and request samples for sampling all lights
-    u_int nLights = scene->lights.size();
+    uint32_t nLights = scene->lights.size();
     lightSampleOffsets = new LightSampleOffsets[nLights];
     bsdfSampleOffsets = new BSDFSampleOffsets[nLights];
-    for (u_int i = 0; i < nLights; ++i) {
+    for (uint32_t i = 0; i < nLights; ++i) {
         const Light *light = scene->lights[i];
         int nSamples = light->nSamples;
         if (sampler) nSamples = sampler->RoundSize(nSamples);
@@ -261,16 +261,16 @@ void DipoleSubsurfaceIntegrator::Preprocess(const Scene *scene,
     vector<Task *> tasks;
     RWMutex *mutex = RWMutex::Create();
     int nTasks = NumSystemCores();
-    Point origin = camera->CameraToWorld(camera->ShutterOpen,
+    Point origin = camera->CameraToWorld(camera->shutterOpen,
                                          Point(0, 0, 0));
     for (int i = 0; i < nTasks; ++i)
-        tasks.push_back(new PoissonPointTask(scene, origin, camera->ShutterOpen, i,
+        tasks.push_back(new PoissonPointTask(scene, origin, camera->shutterOpen, i,
             minSampleDist, maxFails, *mutex, repeatedFails, maxRepeatedFails,
             totalPathsTraced, totalRaysTraced, numPointsAdded, sphere, pointOctree,
             irradiancePoints, prog));
     EnqueueTasks(tasks);
     WaitForAllTasks();
-    for (u_int i = 0; i < tasks.size(); ++i)
+    for (uint32_t i = 0; i < tasks.size(); ++i)
         delete tasks[i];
     RWMutex::Destroy(mutex);
     prog.Done();
@@ -280,15 +280,15 @@ void DipoleSubsurfaceIntegrator::Preprocess(const Scene *scene,
     MemoryArena arena;
     PBRT_SUBSURFACE_STARTED_COMPUTING_IRRADIANCE_VALUES();
     ProgressReporter progress(irradiancePoints.size(), "Computing Irradiances");
-    for (u_int i = 0; i < irradiancePoints.size(); ++i) {
+    for (uint32_t i = 0; i < irradiancePoints.size(); ++i) {
         IrradiancePoint &ip = irradiancePoints[i];
-        for (u_int j = 0; j < scene->lights.size(); ++j) {
+        for (uint32_t j = 0; j < scene->lights.size(); ++j) {
             // Add irradiance from light at point
             const Light *light = scene->lights[j];
             Spectrum Elight = 0.f;
             int nSamples = RoundUpPow2(light->nSamples);
-            u_int scramble[2] = { rng.RandomUInt(), rng.RandomUInt() };
-            u_int compScramble = rng.RandomUInt();
+            uint32_t scramble[2] = { rng.RandomUInt(), rng.RandomUInt() };
+            uint32_t compScramble = rng.RandomUInt();
             for (int s = 0; s < nSamples; ++s) {
                 float lpos[2];
                 Sample02(s, scramble, lpos);
@@ -298,10 +298,10 @@ void DipoleSubsurfaceIntegrator::Preprocess(const Scene *scene,
                 float lightPdf;
                 VisibilityTester visibility;
                 Spectrum Li = light->Sample_L(ip.p, ip.rayEpsilon,
-                    ls, camera->ShutterOpen, &wi, &lightPdf, &visibility);
+                    ls, camera->shutterOpen, &wi, &lightPdf, &visibility);
                 if (Dot(wi, ip.n) <= 0.) continue;
                 if (Li.IsBlack() || lightPdf == 0.f) continue;
-                Li *= visibility.Transmittance(scene, renderer, NULL, &rng, arena);
+                Li *= visibility.Transmittance(scene, renderer, NULL, rng, arena);
                 if (visibility.Unoccluded(scene))
                     Elight += Li * Dot(wi, ip.n) / lightPdf;
             }
@@ -316,9 +316,9 @@ void DipoleSubsurfaceIntegrator::Preprocess(const Scene *scene,
 
     // Create octree of clustered irradiance samples
     octree = octreeArena.Alloc<SubsurfaceOctreeNode>();
-    for (u_int i = 0; i < irradiancePoints.size(); ++i)
+    for (uint32_t i = 0; i < irradiancePoints.size(); ++i)
         octreeBounds = Union(octreeBounds, irradiancePoints[i].p);
-    for (u_int i = 0; i < irradiancePoints.size(); ++i)
+    for (uint32_t i = 0; i < irradiancePoints.size(); ++i)
         if (irradiancePoints[i].E.y() > 0.f)
             octree->Insert(octreeBounds, &irradiancePoints[i], octreeArena);
     octree->InitHierarchy();
@@ -356,14 +356,14 @@ void PoissonPointTask::Run() {
                     ip.p = hitGeometry.p;
                     ip.n = hitGeometry.nn;
                     ip.area = M_PI * minSampleDist * minSampleDist;
-                    ip.rayEpsilon = isect.RayEpsilon;
+                    ip.rayEpsilon = isect.rayEpsilon;
                     candidates.push_back(ip);
                 }
 
                 // Generate random ray from intersection point
                 Vector dir = UniformSampleSphere(rng.RandomFloat(), rng.RandomFloat());
                 dir = Faceforward(dir, hitGeometry.nn);
-                ray = Ray(hitGeometry.p, dir, ray, isect.RayEpsilon);
+                ray = Ray(hitGeometry.p, dir, ray, isect.rayEpsilon);
             }
             arena.FreeAll();
         }
@@ -371,7 +371,7 @@ void PoissonPointTask::Run() {
         vector<bool> candidateRejected;
         candidateRejected.reserve(candidates.size());
         RWMutexLock lock(mutex, READ);
-        for (u_int i = 0; i < candidates.size(); ++i) {
+        for (uint32_t i = 0; i < candidates.size(); ++i) {
             IrradiancePoint &ip = candidates[i];
             PoissonCheck check(minSampleDist, ip.p);
             octree.Lookup(ip.p, check);
@@ -385,7 +385,7 @@ void PoissonPointTask::Run() {
         totalPathsTraced += pathsTraced;
         totalRaysTraced += raysTraced;
         int oldMaxRepeatedFails = maxRepeatedFails;
-        for (u_int i = 0; i < candidates.size(); ++i) {
+        for (uint32_t i = 0; i < candidates.size(); ++i) {
             if (candidateRejected[i]) {
                 // Update for rejected candidate point
                 maxRepeatedFails = max(maxRepeatedFails, ++repeatedFails);
@@ -431,7 +431,7 @@ void PoissonPointTask::Run() {
 
 Spectrum DipoleSubsurfaceIntegrator::Li(const Scene *scene, const Renderer *renderer,
         const RayDifferential &ray, const Intersection &isect,
-        const Sample *sample, MemoryArena &arena) const {
+        const Sample *sample, RNG &rng, MemoryArena &arena) const {
     Spectrum L(0.);
     Vector wo = -ray.d;
     // Compute emitted light if ray hit an area light source
@@ -443,15 +443,11 @@ Spectrum DipoleSubsurfaceIntegrator::Li(const Scene *scene, const Renderer *rend
     const Normal &n = bsdf->dgShading.nn;
     // Evaluate BSSRDF and possibly compute subsurface scattering
     BSSRDF *bssrdf = isect.GetBSSRDF(ray, arena);
-    if (bssrdf) {
+    if (bssrdf && octree) {
         Spectrum sigma_a  = bssrdf->sigma_a();
         Spectrum sigmap_s = bssrdf->sigma_prime_s();
         Spectrum sigmap_t = sigmap_s + sigma_a;
         if (!sigmap_t.IsBlack()) {
-            // Compute direct transmittance in scattering medium
-
-            // Compute single scattering in scattering medium
-
             // Use hierarchical integration to evaluate reflection from dipole model
             PBRT_SUBSURFACE_STARTED_OCTREE_LOOKUP(const_cast<Point *>(&p));
             DiffusionReflectance Rd(sigma_a, sigmap_s, bssrdf->eta());
@@ -464,12 +460,13 @@ Spectrum DipoleSubsurfaceIntegrator::Li(const Scene *scene, const Renderer *rend
         }
     }
     L += UniformSampleAllLights(scene, renderer, arena, p, n,
-        wo, isect.RayEpsilon, bsdf, sample, lightSampleOffsets, bsdfSampleOffsets);
+        wo, isect.rayEpsilon, ray.time, bsdf, sample, rng, lightSampleOffsets,
+        bsdfSampleOffsets);
     if (ray.depth < maxSpecularDepth) {
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, bsdf, *sample->rng, isect, renderer,
+        L += SpecularReflect(ray, bsdf, rng, isect, renderer,
                              scene, sample, arena);
-        L += SpecularTransmit(ray, bsdf, *sample->rng, isect, renderer,
+        L += SpecularTransmit(ray, bsdf, rng, isect, renderer,
                               scene, sample, arena);
     }
     return L;

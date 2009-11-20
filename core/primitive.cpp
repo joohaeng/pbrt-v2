@@ -28,7 +28,7 @@
 #include "intersection.h"
 
 // Primitive Method Definitions
-uint32_t Primitive::nextPrimitiveId = 1;
+uint32_t Primitive::nextprimitiveId = 1;
 Primitive::~Primitive() { }
 
 bool Primitive::CanIntersect() const {
@@ -91,7 +91,7 @@ bool TransformedPrimitive::Intersect(const Ray &r,
     if (!primitive->Intersect(ray, isect))
         return false;
     r.maxt = ray.maxt;
-    isect->PrimitiveId = PrimitiveId;
+    isect->primitiveId = primitiveId;
     if (!w2p.IsIdentity()) {
         // Compute world-to-object transformation for instance
         isect->WorldToObject = isect->WorldToObject * w2p;
@@ -137,7 +137,7 @@ void GeometricPrimitive::
         const {
     vector<Reference<Shape> > r;
     shape->Refine(r);
-    for (u_int i = 0; i < r.size(); ++i) {
+    for (uint32_t i = 0; i < r.size(); ++i) {
         GeometricPrimitive *gp = new GeometricPrimitive(r[i],
                material, areaLight);
         refined.push_back(gp);
@@ -159,9 +159,9 @@ bool GeometricPrimitive::Intersect(const Ray &r,
     isect->primitive = this;
     isect->WorldToObject = *shape->WorldToObject;
     isect->ObjectToWorld = *shape->ObjectToWorld;
-    isect->ShapeId = shape->ShapeId;
-    isect->PrimitiveId = PrimitiveId;
-    isect->RayEpsilon = rayEpsilon;
+    isect->shapeId = shape->shapeId;
+    isect->primitiveId = primitiveId;
+    isect->rayEpsilon = rayEpsilon;
     r.maxt = thit;
     return true;
 }

@@ -33,7 +33,7 @@
 class Primitive : public ReferenceCounted {
 public:
     // Primitive Interface
-    Primitive() : PrimitiveId(nextPrimitiveId++) { }
+    Primitive() : primitiveId(nextprimitiveId++) { }
     virtual ~Primitive();
     virtual BBox WorldBound() const = 0;
     virtual bool CanIntersect() const;
@@ -48,10 +48,10 @@ public:
         const Transform &ObjectToWorld, MemoryArena &arena) const = 0;
 
     // Primitive Public Data
-    const uint32_t PrimitiveId;
+    const uint32_t primitiveId;
 protected:
     // Primitive Protected Data
-    static uint32_t nextPrimitiveId;
+    static uint32_t nextprimitiveId;
 };
 
 
@@ -63,12 +63,10 @@ public:
     bool CanIntersect() const;
     void Refine(vector<Reference<Primitive> > &refined) const;
     virtual BBox WorldBound() const;
-    virtual bool Intersect(const Ray &r,
-                           Intersection *isect) const;
+    virtual bool Intersect(const Ray &r, Intersection *isect) const;
     virtual bool IntersectP(const Ray &r) const;
     GeometricPrimitive(const Reference<Shape> &s,
-                       const Reference<Material> &m,
-                       AreaLight *a);
+                       const Reference<Material> &m, AreaLight *a);
     const AreaLight *GetAreaLight() const;
     BSDF *GetBSDF(const DifferentialGeometry &dg,
                   const Transform &ObjectToWorld, MemoryArena &arena) const;
@@ -89,9 +87,7 @@ public:
     // TransformedPrimitive Public Methods
     TransformedPrimitive(Reference<Primitive> &prim,
                          const AnimatedTransform &w2p)
-        : WorldToPrimitive(w2p) {
-        primitive = prim;
-    }
+        : primitive(prim), WorldToPrimitive(w2p) { }
     bool Intersect(const Ray &r, Intersection *in) const;
     bool IntersectP(const Ray &r) const;
     const AreaLight *GetAreaLight() const { return NULL; }

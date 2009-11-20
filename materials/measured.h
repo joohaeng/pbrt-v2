@@ -40,8 +40,9 @@ public:
                   MemoryArena &arena) const;
 private:
     // MeasuredMaterial Private Data
-    float *regularHalfangleData;
     KdTree<IrregIsotropicBRDFSample> *thetaPhiData;
+    float *regularHalfangleData;
+    uint32_t nThetaH, nThetaD, nPhiD;
     Reference<Texture<float> > bumpMap;
 };
 

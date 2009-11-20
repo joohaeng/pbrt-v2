@@ -95,28 +95,219 @@ Spectrum ScaledBxDF::Sample_f(const Vector &wo, Vector *wi,
     Spectrum f = bxdf->Sample_f(wo, wi, u1, u2, pdf);
     return s * f;
 }
+inline Transform SnellTransform (const Vector &h) {
+	float angle = Degrees(SphericalTheta(h));
+	//if ( abs(h.z) == 1 ) Info("%f %f %f",h.x, h.y, h.z);
+	//Assert( abs(h.z) !=1);
+	//Assert(!isnan(angle));
+	//Assert(angle > 0);
+	Vector axis = Cross(h, Vector(0,0,1));
+	//Info("%f %f %f %f", angle, axis.x, axis.y, axis.z );
+	return Rotate(angle, axis);
+}
+inline Vector SnellDir(const Vector &w, float etai, float etat) {
 
+    // Compute transmitted ray direction
+    float sini2 = SinTheta2(w);
+    float eta = etai / etat;
+    float sint2 = eta * eta * sini2;
+
+    // Handle total internal reflection for transmission
+    //if (sint2 >= 1.) Assert("TIR"); //return 0.;
+    Assert(sint2 <= 1.);
+    float cost = sqrtf(max(0.f, 1.f - sint2));
+	
+	return Vector(eta * w.x, eta * w.y, cost);
+}
+inline Vector SnellDir(const Vector &w, float etai, float etat, const Transform R) {
+	Vector Rw =	R(w);
+	Vector Rwr = SnellDir(Rw, etai, etat);
+	Transform Ri = Inverse(R);
+	return Ri(Rwr);
+}
+
+inline float G(const Vector &wo, const Vector &wi, const Vector &wh) {
+    float NdotWh = AbsCosTheta(wh);
+    float NdotWo = AbsCosTheta(wo);
+    float NdotWi = AbsCosTheta(wi);
+    float WOdotWh = AbsDot(wo, wh);
+	//Info("%f, %f, %f, %f", NdotWh, NdotWo, NdotWi, WOdotWh);
+    return min(1.f, min((2.f * NdotWh * NdotWo / WOdotWh), (2.f * NdotWh * NdotWi / WOdotWh)));
+}
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
-	// wor, wir: refracted direction of wi and wo in the coating layer, respectively
-	Vector wor = Normalize(SnellDir(wo, etai, etat));
-	Vector wir = Normalize(SnellDir(wi, etai, etat));
-    Vector whr = Normalize(wir + wor);
 
-	float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
-	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : Spectrum(1.));
+	Spectrum spectrum_1 = Spectrum(1.f);
 
+	//
+	// exitant ray
+	//
+	Vector wor, wir, whr; // wor, wir: refr dir of wi and wo inside a coating layer
+	//Spectrum t;
+	Transform R;
+	Vector wh = (mf_normal ? Normalize(wi + wo) : Vector(0,0,1));
+#if 1
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+		wir = SnellDir(wi, etai, etat, R);
+	}
+	else {
+		//R = Rotate(0,Vector(0,0,1));	
+		wor = SnellDir(wo, etai, etat);
+		wir = SnellDir(wi, etai, etat);
+	}
+#endif
+	Spectrum t = f21->Evaluate(Dot(wor, wh));
+	//Spectrum t = f21->Evaluate(CosTheta(wor));
+
+	//
+	// Geometric Attenuation
+	//
+	whr = Normalize(wir + wor);
 	float g = G(wor, wir, whr);
-	Spectrum t = (Spectrum(1.f - g)) + (Spectrum(1.f) - f21->Evaluate(CosTheta(wor))) * g;
 
-    return (Spectrum(1.f) - f12->Evaluate(CosTheta(wi))) * bxdf->f(wor, wir) * a * t;
+	//
+	// TIR
+	//
+	t = spectrum_1 - ( tir ? t * g : t);
+
+	//
+	// Absorbtion
+	//
+	float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
+	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
+
+    return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * bxdf_base->f(wor, wir) * a * t;
+	//return t;
+	//return Spectrum(g);
+	//return spectrum_1;
 }
 
 Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
                               float u1, float u2, float *pdf) const {
+#define SMP_0 1
+#ifdef SMP_0
 	Vector wor = SnellDir(wo, etai, etat);
 	Vector wir;
-    Spectrum f = bxdf->Sample_f(wor, &wir, u1, u2, pdf);
+    Spectrum f = bxdf_base->Sample_f(wor, &wir, u1, u2, pdf);
 	*wi = SnellDir(wir, etat, etai);
+#elif SMP_1
+    bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
+#elif SMP_2
+    bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
+	Vector wor, wir;
+	Transform R = Rotate(0,Vector(0,0,1));	
+	Vector wh = Normalize(*wi + wo);
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+		wir = SnellDir(*wi, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+		wir = SnellDir(*wi, etai, etat);
+	}
+    *pdf = bxdf_base->Pdf(wor, wir); // get pdf only
+#elif SMP_3
+	float pdf1, pdf2;
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	Vector wor, wir;
+	Transform R;
+	Vector wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+	}
+    bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf2);
+	if (mf_normal && wh.z < 0.999999 ) {
+		*wi = SnellDir(wir, etat, etai, R);
+	}
+	else {
+		*wi = SnellDir(wir, etat, etai);
+	}
+	//*pdf = (pdf1 + pdf2)/2.f;
+	//*pdf = pdf1 * pdf2;
+	*pdf = pdf2;
+#elif SMP_4
+    bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
+	Vector wor, wir;
+	Transform R = Rotate(0,Vector(0,0,1));	
+	Vector wh = Normalize(*wi + wo);
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+		wir = SnellDir(*wi, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+		wir = SnellDir(*wi, etai, etat);
+	}
+    float pdf2 = bxdf_base->Pdf(wor, wir); // get pdf only
+	*pdf = (*pdf + pdf2)/2.f;
+#elif SMP_5
+	float pdf1, pdf2;
+	Vector wor, wir;
+	Transform R;
+
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	Vector wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+	}
+
+    bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf2);
+	Vector whr = (mf_normal ? Normalize(wor + wir) : Vector(0,0,1));
+	if (mf_normal && whr.z < 0.999999 ) {
+		R = SnellTransform(whr);
+		*wi = SnellDir(wir, etat, etai, R);
+	}
+	else {
+		*wi = SnellDir(wir, etat, etai);
+	}
+
+	*pdf = pdf2;
+#elif SMP_6
+
+	//
+	// 3-point sampling
+	//
+
+	float pdf1, pdf2;
+	Vector wor, wir, wh;
+	Transform R;
+
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		wor = SnellDir(wo, etai, etat, R);
+	}
+	else {
+		wor = SnellDir(wo, etai, etat);
+	}
+
+    bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf2);
+
+    bxdf_coating->Sample_f(wo, wi, u1, u2, &pdf1); // get wi only
+	wh = (mf_normal ? Normalize(*wi + wo) : Vector(0,0,1));
+	if (mf_normal && wh.z < 0.999999 ) {
+		R = SnellTransform(wh);
+		*wi = SnellDir(wir, etat, etai, R);
+	}
+	else {
+		*wi = SnellDir(wir, etat, etai);
+	}
+
+	*pdf = pdf2;
+
+#endif
     return this->f(wo, *wi);
 }
 
@@ -185,7 +376,7 @@ Spectrum SpecularTransmission::Sample_f(const Vector &wo,
 
 
 Spectrum Lambertian::f(const Vector &wo, const Vector &wi) const {
-    return RoverPI;
+    return R * INV_PI;
 }
 
 
@@ -319,7 +510,7 @@ Spectrum BxDF::Sample_f(const Vector &wo, Vector *wi,
 
 
 float BxDF::Pdf(const Vector &wo, const Vector &wi) const {
-    return SameHemisphere(wo, wi) ? fabsf(wi.z) * INV_PI : 0.f;
+    return SameHemisphere(wo, wi) ? AbsCosTheta(wi) * INV_PI : 0.f;
 }
 
 
@@ -343,14 +534,34 @@ float Microfacet::Pdf(const Vector &wo, const Vector &wi) const {
 }
 
 
-void Blinn::Sample_f(const Vector &wo, Vector *wi,
-                     float u1, float u2, float *pdf) const {
-    SampleBlinn(wo, wi, u1, u2, pdf, exponent);
+void Blinn::Sample_f(const Vector &wo, Vector *wi, float u1, float u2,
+                     float *pdf) const {
+    // Compute sampled half-angle vector $\wh$ for Blinn distribution
+    float costheta = powf(u1, 1.f / (exponent+1));
+    float sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
+    float phi = u2 * 2.f * M_PI;
+    Vector wh = SphericalDirection(sintheta, costheta, phi);
+    if (!SameHemisphere(wo, wh)) wh = -wh;
+
+    // Compute incident direction by reflecting about $\wh$
+    *wi = -wo + 2.f * Dot(wo, wh) * wh;
+
+    // Compute PDF for $\wi$ from Blinn distribution
+    float blinn_pdf = ((exponent + 1.f) * powf(costheta, exponent)) /
+                      (2.f * M_PI * 4.f * Dot(wo, wh));
+    if (Dot(wo, wh) <= 0.f) blinn_pdf = 0.f;
+    *pdf = blinn_pdf;
 }
 
 
 float Blinn::Pdf(const Vector &wo, const Vector &wi) const {
-    return BlinnPdf(wo, wi, exponent);
+    Vector wh = Normalize(wo + wi);
+    float costheta = AbsCosTheta(wh);
+    // Compute PDF for $\wi$ from Blinn distribution
+    float blinn_pdf = ((exponent + 1.f) * powf(costheta, exponent)) /
+                      (2.f * M_PI * 4.f * Dot(wo, wh));
+    if (Dot(wo, wh) <= 0.f) blinn_pdf = 0.f;
+    return blinn_pdf;
 }
 
 
@@ -381,8 +592,14 @@ void Anisotropic::Sample_f(const Vector &wo, Vector *wi,
     *wi = -wo + 2.f * Dot(wo, wh) * wh;
 
     // Compute PDF for $\wi$ from anisotropic distribution
-    float anisotropic_pdf = D(wh) / (4.f * Dot(wo, wh));
-    if (Dot(wo, wh) < 0.f) anisotropic_pdf = 0.f;
+    float costhetah = AbsCosTheta(wh);
+    float ds = 1.f - costhetah * costhetah;
+    float anisotropic_pdf = 0.f;
+    if (ds > 0.f && Dot(wo, wh) > 0.f) {
+        float e = (ex * wh.x * wh.x + ey * wh.y * wh.y) / ds;
+        float d = sqrtf((ex+1.f) * (ey+1.f)) * INV_TWOPI * powf(costhetah, e);
+        anisotropic_pdf = d / (4.f * Dot(wo, wh));
+    }
     *pdf = anisotropic_pdf;
 }
 
@@ -402,10 +619,15 @@ void Anisotropic::sampleFirstQuadrant(float u1, float u2,
 
 float Anisotropic::Pdf(const Vector &wo, const Vector &wi) const {
     Vector wh = Normalize(wo + wi);
-    if (!SameHemisphere(wo, wh)) wh = -wh;
     // Compute PDF for $\wi$ from anisotropic distribution
-    float anisotropic_pdf = D(wh) / (4.f * Dot(wo, wh));
-    if (Dot(wo, wh) < 0.f) anisotropic_pdf = 0.f;
+    float costhetah = AbsCosTheta(wh);
+    float ds = 1.f - costhetah * costhetah;
+    float anisotropic_pdf = 0.f;
+    if (ds > 0.f && Dot(wo, wh) > 0.f) {
+        float e = (ex * wh.x * wh.x + ey * wh.y * wh.y) / ds;
+        float d = sqrtf((ex+1.f) * (ey+1.f)) * INV_TWOPI * powf(costhetah, e);
+        anisotropic_pdf = d / (4.f * Dot(wo, wh));
+    }
     return anisotropic_pdf;
 }
 
@@ -430,7 +652,7 @@ Spectrum FresnelBlend::Sample_f(const Vector &wo, Vector *wi,
 
 float FresnelBlend::Pdf(const Vector &wo, const Vector &wi) const {
     if (!SameHemisphere(wo, wi)) return 0.f;
-    return .5f * (fabsf(wi.z) * INV_PI + distribution->Pdf(wo, wi));
+    return .5f * (AbsCosTheta(wi) * INV_PI + distribution->Pdf(wo, wi));
 }
 
 
@@ -449,7 +671,7 @@ Spectrum BxDF::rho(const Vector &w, int nSamples,
 
 
 Spectrum BxDF::rho(int nSamples, const float *samples1,
-        const float *samples2) const {
+                   const float *samples2) const {
     Spectrum r = 0.;
     for (int i = 0; i < nSamples; ++i) {
         // Estimate one term of $\rho_\roman{hh}$
@@ -468,13 +690,13 @@ Spectrum BxDF::rho(int nSamples, const float *samples1,
 // BSDF Method Definitions
 BSDFSampleOffsets::BSDFSampleOffsets(int count, Sample *sample) {
     nSamples = count;
-    dirOffset = sample->Add2D(nSamples);
     componentOffset = sample->Add1D(nSamples);
+    dirOffset = sample->Add2D(nSamples);
 }
 
 
 BSDFSample::BSDFSample(const Sample *sample,
-                       const BSDFSampleOffsets &offsets, u_int num) {
+                       const BSDFSampleOffsets &offsets, uint32_t num) {
     Assert(num < sample->n2D[offsets.dirOffset]);
     Assert(num < sample->n1D[offsets.componentOffset]);
     uDir[0] = sample->twoD[offsets.dirOffset][2*num];
@@ -484,7 +706,7 @@ BSDFSample::BSDFSample(const Sample *sample,
 
 
 Spectrum BSDF::Sample_f(const Vector &wo, Vector *wi, RNG &rng, BxDFType flags,
-    BxDFType *sampledType) const {
+        BxDFType *sampledType) const {
     float pdf;
     BSDFSample bsdfSample(rng);
     Spectrum f = Sample_f(wo, wi, bsdfSample, &pdf, flags, sampledType);
@@ -524,13 +746,10 @@ Spectrum BSDF::Sample_f(const Vector &woW, Vector *wiW,
     *wiW = LocalToWorld(wi);
 
     // Compute overall PDF with all matching _BxDF_s
-    if (!(bxdf->type & BSDF_SPECULAR) && matchingComps > 1) {
-        for (int i = 0; i < nBxDFs; ++i) {
-            if (bxdfs[i] != bxdf &&
-                bxdfs[i]->MatchesFlags(flags))
+    if (!(bxdf->type & BSDF_SPECULAR) && matchingComps > 1)
+        for (int i = 0; i < nBxDFs; ++i)
+            if (bxdfs[i] != bxdf && bxdfs[i]->MatchesFlags(flags))
                 *pdf += bxdfs[i]->Pdf(wo, wi);
-        }
-    }
     if (matchingComps > 1) *pdf /= matchingComps;
 
     // Compute value of BSDF for sampled direction

@@ -113,9 +113,9 @@ CreateRadianceProbes::~CreateRadianceProbes() {
 
 
 Spectrum CreateRadianceProbes::Li(const Scene *scene, const RayDifferential &ray,
-    const Sample *sample, MemoryArena &arena, Intersection *isect,
-    Spectrum *T) const {
-    Assert(ray.time == sample->Time);
+        const Sample *sample, RNG &rng, MemoryArena &arena, Intersection *isect,
+        Spectrum *T) const {
+    Assert(ray.time == sample->time);
     Spectrum localT;
     if (!T) T = &localT;
     Intersection localIsect;
@@ -123,19 +123,19 @@ Spectrum CreateRadianceProbes::Li(const Scene *scene, const RayDifferential &ray
     Assert(!ray.HasNaNs());
     Spectrum Lo = 0.f;
     if (scene->Intersect(ray, isect))
-        Lo = surfaceIntegrator->Li(scene, this, ray, *isect, sample, arena);
+        Lo = surfaceIntegrator->Li(scene, this, ray, *isect, sample, rng, arena);
     else {
-        for (u_int i = 0; i < scene->lights.size(); ++i)
+        for (uint32_t i = 0; i < scene->lights.size(); ++i)
            Lo += scene->lights[i]->Le(ray);
     }
-    Spectrum Lv = volumeIntegrator->Li(scene, this, ray, sample, T, arena);
+    Spectrum Lv = volumeIntegrator->Li(scene, this, ray, sample, rng, T, arena);
     return *T * Lo + Lv;
 }
 
 
 Spectrum CreateRadianceProbes::Transmittance(const Scene *scene,
-    const RayDifferential &ray, const Sample *sample,
-    MemoryArena &arena, RNG *rng) const {
+    const RayDifferential &ray, const Sample *sample, RNG &rng,
+    MemoryArena &arena) const {
     return volumeIntegrator->Transmittance(scene, this, ray, sample, rng, arena);
 }
 
@@ -179,7 +179,7 @@ void CreateRadianceProbes::Render(const Scene *scene) {
     Reference<Material> nullMaterial = Reference<Material>(NULL);
     GeometricPrimitive sphere(sph, nullMaterial, NULL);
     vector<Point> surfacePoints;
-    u_int nPoints = 32768, maxDepth = 32;
+    uint32_t nPoints = 32768, maxDepth = 32;
     surfacePoints.reserve(nPoints + maxDepth);
     surfacePoints.push_back(pCamera);
     RNG rng;
@@ -188,7 +188,7 @@ void CreateRadianceProbes::Render(const Scene *scene) {
         Point pray = pCamera;
         Vector dir = UniformSampleSphere(rng.RandomFloat(), rng.RandomFloat());
         float rayEpsilon = 0.f;
-        for (u_int i = 0; i < maxDepth; ++i) {
+        for (uint32_t i = 0; i < maxDepth; ++i) {
             Ray ray(pray, dir, rayEpsilon, INFINITY, time);
         
             Intersection isect;
@@ -200,7 +200,7 @@ void CreateRadianceProbes::Render(const Scene *scene) {
         
             DifferentialGeometry &hitGeometry = isect.dg;
             pray = isect.dg.p;
-            rayEpsilon = isect.RayEpsilon;
+            rayEpsilon = isect.rayEpsilon;
             hitGeometry.nn = Faceforward(hitGeometry.nn, -ray.d);
         
             dir = UniformSampleSphere(rng.RandomFloat(), rng.RandomFloat());
@@ -219,7 +219,7 @@ void CreateRadianceProbes::Render(const Scene *scene) {
                                    scene, this, c_in[i]));
     EnqueueTasks(tasks);
     WaitForAllTasks();
-    for (u_int i = 0; i < tasks.size(); ++i)
+    for (uint32_t i = 0; i < tasks.size(); ++i)
         delete tasks[i];
     prog.Done();
 
@@ -281,7 +281,7 @@ void CreateRadProbeTask::Run() {
     RNG rng(pointNum);
     Spectrum *c_probe = new Spectrum[SHTerms(lmax)];
     MemoryArena arena;
-    u_int nFound = 0, lastVisibleOffset = 0;
+    uint32_t nFound = 0, lastVisibleOffset = 0;
     for (int i = 0; i < 256; ++i) {
         if (nFound == 32) break;
         // Try to compute radiance probe contribution at _i_th sample point
@@ -296,7 +296,7 @@ void CreateRadProbeTask::Run() {
         if (scene->IntersectP(Ray(surfacePoints[lastVisibleOffset],
                                   p - surfacePoints[lastVisibleOffset],
                                   1e-4f, 1.f, time))) {
-            u_int j;
+            uint32_t j;
             for (j = 0; j < surfacePoints.size(); ++j) {
                 if (!scene->IntersectP(Ray(surfacePoints[j], p - surfacePoints[j],
                                            1e-4f, 1.f, time))) {

@@ -11,14 +11,15 @@ EXRINCLUDE=-I/opt/local/include/OpenEXR -I/opt/include/OpenEXR
 EXRLIBDIR=-L/opt/local/lib
 
 DEFS=-DPBRT_STATS_NONE -DPBRT_HAS_PTHREADS -DPBRT_HAS_OPENEXR
+DEFS+= -DNDEBUG
 
 # 32 bit
-DEFS+=-DPBRT_POINTER_SIZE=4
-MARCH=-m32
+#DEFS+=-DPBRT_POINTER_SIZE=4
+#MARCH=-m32
 
 # 64 bit
-#DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
-#MARCH=-m64
+DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
+MARCH=-m64
 
 #########################################################################
  
@@ -58,7 +59,7 @@ LIBOBJS=$(addprefix objs/, $(subst /,_,$(LIBSRCS:.cpp=.o)))
  
 HEADERS = $(wildcard */*.h)
  
-default: bin/pbrt #tools
+default: bin/pbrt #tools/bsdftest
  
 pbrt: bin/pbrt
  
@@ -136,6 +137,10 @@ objs/pbrt.o: main/pbrt.cpp
 bin/pbrt: dirs objs/libpbrt.a objs/pbrt.o
 	@echo "Linking $@"
 	@$(CXX) $(CXXFLAGS) -o $@ objs/pbrt.o objs/libpbrt.a $(LIBS)
+
+tools/bsdftest: objs/libpbrt.a
+	@echo -n Buidling tools/bsdftest
+	@$(CXX) $(CXXFLAGS) -o $@ tools/bsdftest.cpp objs/libpbrt.a $(LIBS)
  
 core/pbrtlex.cpp: core/pbrtlex.ll core/pbrtparse.cpp
 	@echo "Lex'ing pbrtlex.ll"

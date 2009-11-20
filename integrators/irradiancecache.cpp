@@ -109,10 +109,10 @@ void IrradianceCacheIntegrator::RequestSamples(Sampler *sampler,
         Sample *sample, const Scene *scene) {
 //    if (lightSampleOffsets != NULL) return;
     // Allocate and request samples for sampling all lights
-    u_int nLights = scene->lights.size();
+    uint32_t nLights = scene->lights.size();
     lightSampleOffsets = new LightSampleOffsets[nLights];
     bsdfSampleOffsets = new BSDFSampleOffsets[nLights];
-    for (u_int i = 0; i < nLights; ++i) {
+    for (uint32_t i = 0; i < nLights; ++i) {
         const Light *light = scene->lights[i];
         int nSamples = light->nSamples;
         if (sampler) nSamples = sampler->RoundSize(nSamples);
@@ -134,7 +134,7 @@ void IrradianceCacheIntegrator::Preprocess(const Scene *scene,
     int xstart, xend, ystart, yend;
     camera->film->GetSampleExtent(&xstart, &xend, &ystart, &yend);
     HaltonSampler sampler(xstart, xend, ystart, yend, 1,
-                          camera->ShutterOpen, camera->ShutterClose, 0);
+                          camera->shutterOpen, camera->shutterClose);
     Sample *sample = new Sample(&sampler, this, NULL, scene);
     const int nTasks = 64;
     ProgressReporter progress(nTasks, "Priming irradiance cache");
@@ -145,7 +145,7 @@ void IrradianceCacheIntegrator::Preprocess(const Scene *scene,
                                                 progress, i, nTasks));
     EnqueueTasks(tasks);
     WaitForAllTasks();
-    for (u_int i = 0; i < tasks.size(); ++i)
+    for (uint32_t i = 0; i < tasks.size(); ++i)
         delete tasks[i];
     progress.Done();
     delete sample;
@@ -165,16 +165,16 @@ void IrradiancePrimeTask::Run() {
     if (!sampler) { progress.Update(); return; }
     MemoryArena arena;
     int sampleCount;
-    RNG rng;
+    RNG rng(29 * taskNum);
     int maxSamples = sampler->MaximumSampleCount();
-    Sample *samples = origSample->Duplicate(maxSamples, rng);
-    while ((sampleCount = sampler->GetMoreSamples(samples)) > 0) {
+    Sample *samples = origSample->Duplicate(maxSamples);
+    while ((sampleCount = sampler->GetMoreSamples(samples, rng)) > 0) {
         for (int i = 0; i < sampleCount; ++i) {
             RayDifferential ray;
             camera->GenerateRayDifferential(samples[i], &ray);
             Intersection isect;
             if (scene->Intersect(ray, &isect))
-                (void)irradianceCache->Li(scene, renderer, ray, isect, &samples[i], arena);
+                (void)irradianceCache->Li(scene, renderer, ray, isect, &samples[i], rng, arena);
         }
         arena.FreeAll();
     }
@@ -186,7 +186,7 @@ void IrradiancePrimeTask::Run() {
 
 Spectrum IrradianceCacheIntegrator::Li(const Scene *scene,
         const Renderer *renderer, const RayDifferential &ray, const Intersection &isect,
-        const Sample *sample, MemoryArena &arena) const {
+        const Sample *sample, RNG &rng, MemoryArena &arena) const {
     Spectrum L(0.);
     // Evaluate BSDF at hit point
     BSDF *bsdf = isect.GetBSDF(ray, arena);
@@ -196,16 +196,16 @@ Spectrum IrradianceCacheIntegrator::Li(const Scene *scene,
     L += isect.Le(wo);
     // Compute direct lighting for irradiance cache
     L += UniformSampleAllLights(scene, renderer, arena, p, n, wo,
-                                isect.RayEpsilon, bsdf, sample,
+                                isect.rayEpsilon, ray.time, bsdf, sample, rng,
                                 lightSampleOffsets, bsdfSampleOffsets);
 
     // Compute indirect lighting for irradiance cache
     if (ray.depth + 1 < maxSpecularDepth) {
         Vector wi;
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, bsdf, *sample->rng, isect, renderer,
+        L += SpecularReflect(ray, bsdf, rng, isect, renderer,
                              scene, sample, arena);
-        L += SpecularTransmit(ray, bsdf, *sample->rng, isect, renderer,
+        L += SpecularTransmit(ray, bsdf, rng, isect, renderer,
                               scene, sample, arena);
     }
 
@@ -216,11 +216,11 @@ Spectrum IrradianceCacheIntegrator::Li(const Scene *scene,
     // Compute pixel spacing in world space at intersection point
     float pixelSpacing = sqrtf(Cross(isect.dg.dpdx, isect.dg.dpdy).Length());
     BxDFType flags = BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE | BSDF_GLOSSY);
-    L += indirectLo(p, ng, pixelSpacing, wo, isect.RayEpsilon,
-                    bsdf, flags, sample, scene, renderer, arena);
+    L += indirectLo(p, ng, pixelSpacing, wo, isect.rayEpsilon,
+                    bsdf, flags, rng, scene, renderer, arena);
     flags = BxDFType(BSDF_TRANSMISSION | BSDF_DIFFUSE | BSDF_GLOSSY);
-    L += indirectLo(p, -ng, pixelSpacing, wo, isect.RayEpsilon,
-                    bsdf, flags, sample, scene, renderer, arena);
+    L += indirectLo(p, -ng, pixelSpacing, wo, isect.rayEpsilon,
+                    bsdf, flags, rng, scene, renderer, arena);
     return L;
 }
 
@@ -228,7 +228,7 @@ Spectrum IrradianceCacheIntegrator::Li(const Scene *scene,
 Spectrum IrradianceCacheIntegrator::indirectLo(const Point &p,
         const Normal &ng, float pixelSpacing,
         const Vector &wo, float rayEpsilon, BSDF *bsdf, BxDFType flags,
-        const Sample *sample, const Scene *scene,
+        RNG &rng, const Scene *scene,
         const Renderer *renderer, MemoryArena &arena) const {
     if (bsdf->NumComponents(flags) == 0)
         return Spectrum(0.);
@@ -238,8 +238,8 @@ Spectrum IrradianceCacheIntegrator::indirectLo(const Point &p,
     if (!interpolateE(scene, p, ng, &E, &wi)) {
         // Compute irradiance at current point
         PBRT_IRRADIANCE_CACHE_STARTED_COMPUTING_IRRADIANCE(const_cast<Point *>(&p), const_cast<Normal *>(&ng));
-        u_int scramble[2] = { sample->rng->RandomUInt(),
-                              sample->rng->RandomUInt() };
+        uint32_t scramble[2] = { rng.RandomUInt(),
+                                 rng.RandomUInt() };
         float minHitDistance = INFINITY;
         Vector weightedPrimaryDir(0,0,0);
         Spectrum LiSum = 0.f;
@@ -253,7 +253,7 @@ Spectrum IrradianceCacheIntegrator::indirectLo(const Point &p,
 
             // Trace ray to sample radiance for irradiance estimate
             PBRT_IRRADIANCE_CACHE_STARTED_RAY(&r);
-            Spectrum L = pathL(r, scene, renderer, sample, arena);
+            Spectrum L = pathL(r, scene, renderer, rng, arena);
             LiSum += L;
             weightedPrimaryDir += r.d * L.y();
             float dist = r.maxt * r.d.Length();
@@ -320,7 +320,7 @@ bool IrradProcess::operator()(const IrradianceSample *sample) {
 
 
 Spectrum IrradianceCacheIntegrator::pathL(Ray &r, const Scene *scene,
-        const Renderer *renderer, const Sample *sample, MemoryArena &arena) const {
+        const Renderer *renderer, RNG &rng, MemoryArena &arena) const {
     Spectrum L(0.f);
     Spectrum pathThroughput = 1.;
     RayDifferential ray(r);
@@ -332,10 +332,7 @@ Spectrum IrradianceCacheIntegrator::pathL(Ray &r, const Scene *scene,
             break;
         if (pathLength == 0)
             r.maxt = ray.maxt;
-        else if (pathLength == 1)
-            pathThroughput *= renderer->Transmittance(scene, ray, sample, arena, NULL);
-        else
-            pathThroughput *= renderer->Transmittance(scene, ray, NULL, arena, sample->rng);
+        pathThroughput *= renderer->Transmittance(scene, ray, NULL, rng, arena);
         // Possibly add emitted light at path vertex
         if (specularBounce)
             L += pathThroughput * isect.Le(-ray.d);
@@ -346,25 +343,25 @@ Spectrum IrradianceCacheIntegrator::pathL(Ray &r, const Scene *scene,
         const Normal &n = bsdf->dgShading.nn;
         Vector wo = -ray.d;
         L += pathThroughput *
-            UniformSampleOneLight(scene, renderer, arena, p, n, wo, isect.RayEpsilon,
-                                  bsdf, sample);
+            UniformSampleOneLight(scene, renderer, arena, p, n, wo, isect.rayEpsilon,
+                                  ray.time, bsdf, NULL, rng);
         if (pathLength+1 == maxIndirectDepth) break;
         // Sample BSDF to get new path direction
         // Get random numbers for sampling new direction, \mono{bs1}, \mono{bs2}, and \mono{bcs}
         Vector wi;
         float pdf;
         BxDFType flags;
-        Spectrum f = bsdf->Sample_f(wo, &wi, BSDFSample(*sample->rng),
+        Spectrum f = bsdf->Sample_f(wo, &wi, BSDFSample(rng),
             &pdf, BSDF_ALL, &flags);
         if (f.IsBlack() || pdf == 0.)
             break;
         specularBounce = (flags & BSDF_SPECULAR) != 0;
         pathThroughput *= f * AbsDot(wi, n) / pdf;
-        ray = RayDifferential(p, wi, ray, isect.RayEpsilon);
+        ray = RayDifferential(p, wi, ray, isect.rayEpsilon);
         // Possibly terminate the path
         if (pathLength > 2) {
             float rrProb = min(1.f, pathThroughput.y());
-            if (sample->rng->RandomFloat() > rrProb)
+            if (rng.RandomFloat() > rrProb)
                 break;
             pathThroughput /= rrProb;
         }

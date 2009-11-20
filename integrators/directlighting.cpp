@@ -46,10 +46,10 @@ void DirectLightingIntegrator::RequestSamples(Sampler *sampler,
         Sample *sample, const Scene *scene) {
     if (strategy == SAMPLE_ALL_UNIFORM) {
         // Allocate and request samples for sampling all lights
-        u_int nLights = scene->lights.size();
+        uint32_t nLights = scene->lights.size();
         lightSampleOffsets = new LightSampleOffsets[nLights];
         bsdfSampleOffsets = new BSDFSampleOffsets[nLights];
-        for (u_int i = 0; i < nLights; ++i) {
+        for (uint32_t i = 0; i < nLights; ++i) {
             const Light *light = scene->lights[i];
             int nSamples = light->nSamples;
             if (sampler) nSamples = sampler->RoundSize(nSamples);
@@ -71,7 +71,7 @@ void DirectLightingIntegrator::RequestSamples(Sampler *sampler,
 
 Spectrum DirectLightingIntegrator::Li(const Scene *scene,
         const Renderer *renderer, const RayDifferential &ray,
-        const Intersection &isect, const Sample *sample, MemoryArena &arena) const {
+        const Intersection &isect, const Sample *sample, RNG &rng, MemoryArena &arena) const {
     Spectrum L(0.f);
     // Evaluate BSDF at hit point
     BSDF *bsdf = isect.GetBSDF(ray, arena);
@@ -87,21 +87,22 @@ Spectrum DirectLightingIntegrator::Li(const Scene *scene,
         switch (strategy) {
             case SAMPLE_ALL_UNIFORM:
                 L += UniformSampleAllLights(scene, renderer, arena, p, n, wo,
-                    isect.RayEpsilon, bsdf, sample, lightSampleOffsets, bsdfSampleOffsets);
+                    isect.rayEpsilon, ray.time, bsdf, sample, rng,
+                    lightSampleOffsets, bsdfSampleOffsets);
                 break;
             case SAMPLE_ONE_UNIFORM:
                 L += UniformSampleOneLight(scene, renderer, arena, p, n, wo,
-                    isect.RayEpsilon, bsdf, sample, lightNumOffset, lightSampleOffsets,
-                    bsdfSampleOffsets);
+                    isect.rayEpsilon, ray.time, bsdf, sample, rng,
+                    lightNumOffset, lightSampleOffsets, bsdfSampleOffsets);
                 break;
         }
     }
     if (ray.depth + 1 < maxDepth) {
         Vector wi;
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, bsdf, *sample->rng, isect, renderer,
+        L += SpecularReflect(ray, bsdf, rng, isect, renderer,
                              scene, sample, arena);
-        L += SpecularTransmit(ray, bsdf, *sample->rng, isect, renderer,
+        L += SpecularTransmit(ray, bsdf, rng, isect, renderer,
                               scene, sample, arena);
     }
     return L;

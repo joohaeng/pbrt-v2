@@ -28,260 +28,7 @@
 #include "shape.h"
 #include "volume.h"
 
-// Sampling Function Definitions
-void StratifiedSample1D(float *samp, int nSamples,
-                                RNG &rng, bool jitter) {
-    float invTot = 1.f / nSamples;
-    for (int i = 0;  i < nSamples; ++i) {
-        float delta = 0.5f;
-        if (jitter)
-            delta = rng.RandomFloat();
-        *samp++ = (i + delta) * invTot;
-    }
-}
-
-
-void StratifiedSample2D(float *samp, int nx, int ny,
-                                RNG &rng, bool jitter) {
-    float dx = 1.f / nx, dy = 1.f / ny;
-    for (int y = 0; y < ny; ++y)
-        for (int x = 0; x < nx; ++x) {
-            float jx = 0.5f, jy = 0.5f;
-            if (jitter) {
-                jx = rng.RandomFloat();
-                jy = rng.RandomFloat();
-            }
-            *samp++ = (x + jx) * dx;
-            *samp++ = (y + jy) * dy;
-        }
-}
-
-
-void Shuffle(float *samp, u_int count, u_int dims, RNG &rng) {
-    for (u_int i = 0; i < count; ++i) {
-        u_int other = i + (rng.RandomUInt() % (count - i));
-        for (u_int j = 0; j < dims; ++j)
-            swap(samp[dims*i + j], samp[dims*other + j]);
-    }
-}
-
-
-void LatinHypercube(float *samples, u_int nSamples, u_int nDim, RNG &rng) {
-    // Generate LHS samples along diagonal
-    float delta = 1.f / nSamples;
-    for (u_int i = 0; i < nSamples; ++i)
-        for (u_int j = 0; j < nDim; ++j)
-            samples[nDim * i + j] = (i + (rng.RandomFloat())) * delta;
-
-    // Permute LHS samples in each dimension
-    for (u_int i = 0; i < nDim; ++i) {
-        for (u_int j = 0; j < nSamples; ++j) {
-            u_int other = j + (rng.RandomUInt() % (nSamples - j));
-            swap(samples[nDim * j + i],
-                 samples[nDim * other + i]);
-        }
-    }
-}
-
-
-int LDPixelSampleFloatsNeeded(const Sample *sample, int pixelSamples) {
-    int n = 5; // 2 x lens + 2 x pixel + time
-    u_int count1D = sample->n1D.size();
-    u_int count2D = sample->n2D.size();
-    const u_int *n1D = count1D > 0 ? &(sample->n1D[0]) : NULL;
-    const u_int *n2D = count2D > 0 ? &(sample->n2D[0]) : NULL;
-    for (u_int i = 0; i < count1D; ++i)
-        n += n1D[i];
-    for (u_int i = 0; i < count2D; ++i)
-        n += 2 * n2D[i];
-    return pixelSamples * n;
-}
-
-
-void LDPixelSample(int xPos, int yPos,
-        float ShutterOpen, float ShutterClose, int pixelSamples,
-        Sample *samples, float *buf) {
-    // Allocate temporary arrays for low-discrepancy samples
-    float *imageSamples = buf; buf += 2 * pixelSamples;
-    float *lensSamples = buf;  buf += 2 * pixelSamples;
-    float *timeSamples = buf;  buf += pixelSamples;
-    
-    u_int count1D = samples[0].n1D.size();
-    u_int count2D = samples[0].n2D.size();
-    const u_int *n1D = count1D > 0 ? &samples[0].n1D[0] : NULL;
-    const u_int *n2D = count2D > 0 ? &samples[0].n2D[0] : NULL;
-    float **oneDSamples = ALLOCA(float *, count1D);
-    float **twoDSamples = ALLOCA(float *, count2D);
-    for (u_int i = 0; i < count1D; ++i) {
-        oneDSamples[i] = buf;
-        buf += n1D[i] * pixelSamples;
-    }
-    for (u_int i = 0; i < count2D; ++i) {
-        twoDSamples[i] = buf;
-        buf += 2 * n2D[i] * pixelSamples;
-    }
-
-    // Generate low-discrepancy pixel samples
-    LDShuffleScrambled2D(1, pixelSamples, imageSamples, *samples[0].rng);
-    LDShuffleScrambled2D(1, pixelSamples, lensSamples, *samples[0].rng);
-    LDShuffleScrambled1D(1, pixelSamples, timeSamples, *samples[0].rng);
-    for (u_int i = 0; i < count1D; ++i)
-        LDShuffleScrambled1D(n1D[i], pixelSamples,
-                             oneDSamples[i], *samples[0].rng);
-    for (u_int i = 0; i < count2D; ++i)
-        LDShuffleScrambled2D(n2D[i], pixelSamples,
-                             twoDSamples[i], *samples[0].rng);
-
-    // Initialize _samples_ with computed sample values
-    for (int i = 0; i < pixelSamples; ++i) {
-        samples[i].ImageX = xPos + imageSamples[2*i];
-        samples[i].ImageY = yPos + imageSamples[2*i+1];
-        samples[i].Time = Lerp(timeSamples[i], ShutterOpen, ShutterClose);
-        samples[i].LensU = lensSamples[2*i];
-        samples[i].LensV = lensSamples[2*i+1];
-        for (u_int j = 0; j < count1D; ++j) {
-            int startSamp = n1D[j] * i;
-            for (u_int k = 0; k < n1D[j]; ++k)
-                samples[i].oneD[j][k] = oneDSamples[j][startSamp+k];
-        }
-        for (u_int j = 0; j < count2D; ++j) {
-            int startSamp = 2 * n2D[j] * i;
-            for (u_int k = 0; k < 2*n2D[j]; ++k)
-                samples[i].twoD[j][k] = twoDSamples[j][startSamp+k];
-        }
-    }
-}
-
-
-
-// MC Function Definitions
-void RejectionSampleDisk(float *x, float *y, RNG &rng) {
-    float sx, sy;
-    do {
-        sx = 1.f - 2.f * rng.RandomFloat();
-        sy = 1.f - 2.f * rng.RandomFloat();
-    } while (sx*sx + sy*sy > 1.f);
-    *x = sx;
-    *y = sy;
-}
-
-
-Vector UniformSampleHemisphere(float u1, float u2) {
-    float z = u1;
-    float r = sqrtf(max(0.f, 1.f - z*z));
-    float phi = 2 * M_PI * u2;
-    float x = r * cosf(phi);
-    float y = r * sinf(phi);
-    return Vector(x, y, z);
-}
-
-
-float UniformHemispherePdf() {
-    return INV_TWOPI;
-}
-
-
-Vector UniformSampleSphere(float u1, float u2) {
-    float z = 1.f - 2.f * u1;
-    float r = sqrtf(max(0.f, 1.f - z*z));
-    float phi = 2.f * M_PI * u2;
-    float x = r * cosf(phi);
-    float y = r * sinf(phi);
-    return Vector(x, y, z);
-}
-
-
-float UniformSpherePdf() {
-    return 1.f / (4.f * M_PI);
-}
-
-
-void UniformSampleDisk(float u1, float u2, float *x, float *y) {
-    float r = sqrtf(u1);
-    float theta = 2.0f * M_PI * u2;
-    *x = r * cosf(theta);
-    *y = r * sinf(theta);
-}
-
-
-void ConcentricSampleDisk(float u1, float u2,
-                          float *dx, float *dy) {
-    float r, theta;
-    // Map uniform random numbers to $[-1,1]^2$
-    float sx = 2 * u1 - 1;
-    float sy = 2 * u2 - 1;
-
-    // Map square to $(r,\theta)$
-
-    // Handle degeneracy at the origin
-    if (sx == 0.0 && sy == 0.0) {
-        *dx = 0.0;
-        *dy = 0.0;
-        return;
-    }
-    if (sx >= -sy) {
-        if (sx > sy) {
-            // Handle first region of disk
-            r = sx;
-            if (sy > 0.0)
-                theta = sy/r;
-            else
-                theta = 8.0f + sy/r;
-        }
-        else {
-            // Handle second region of disk
-            r = sy;
-            theta = 2.0f - sx/r;
-        }
-    }
-    else {
-        if (sx <= sy) {
-            // Handle third region of disk
-            r = -sx;
-            theta = 4.0f - sy/r;
-        }
-        else {
-            // Handle fourth region of disk
-            r = -sy;
-            theta = 6.0f + sx/r;
-        }
-    }
-    theta *= M_PI / 4.f;
-    *dx = r*cosf(theta);
-    *dy = r*sinf(theta);
-}
-
-
-void UniformSampleTriangle(float u1, float u2,
-                           float *u, float *v) {
-    float su1 = sqrtf(u1);
-    *u = 1.f - su1;
-    *v = u2 * su1;
-}
-
-
-Distribution2D::Distribution2D(const float *func, int nu, int nv) {
-    pConditionalV.reserve(nv);
-    for (int v = 0; v < nv; ++v) {
-        // Compute conditional sampling distribution for $\tilde{v}$
-        pConditionalV.push_back(new Distribution1D(&func[v*nu], nu));
-    }
-    // Compute marginal sampling distribution $p[\tilde{v}]$
-    vector<float> marginalFunc;
-    marginalFunc.reserve(nv);
-    for (int v = 0; v < nv; ++v)
-        marginalFunc.push_back(pConditionalV[v]->funcInt);
-    pMarginal = new Distribution1D(&marginalFunc[0], nv);
-}
-
-
-Distribution2D::~Distribution2D() {
-    delete pMarginal;
-    for (u_int i = 0; i < pConditionalV.size(); ++i)
-        delete pConditionalV[i];
-}
-
-
+// Sampling Local Definitions
 static const int primes[] = {
     // First 1000 prime numbers
           2,      3,      5,      7,     11,     13,     17,     19,     23,     29,
@@ -387,51 +134,254 @@ static const int primes[] = {
 };
 
 
-PermutedHalton::PermutedHalton(u_int d, RNG &rng) {
+
+// Sampling Function Definitions
+void StratifiedSample1D(float *samp, int nSamples, RNG &rng, bool jitter) {
+    float invTot = 1.f / nSamples;
+    for (int i = 0;  i < nSamples; ++i) {
+        float delta = jitter ? rng.RandomFloat() : 0.5f;
+        *samp++ = (i + delta) * invTot;
+    }
+}
+
+
+void StratifiedSample2D(float *samp, int nx, int ny, RNG &rng, bool jitter) {
+    float dx = 1.f / nx, dy = 1.f / ny;
+    for (int y = 0; y < ny; ++y)
+        for (int x = 0; x < nx; ++x) {
+            float jx = jitter ? rng.RandomFloat() : 0.5f;
+            float jy = jitter ? rng.RandomFloat() : 0.5f;
+            *samp++ = (x + jx) * dx;
+            *samp++ = (y + jy) * dy;
+        }
+}
+
+
+void LatinHypercube(float *samples, uint32_t nSamples, uint32_t nDim,
+        RNG &rng) {
+    // Generate LHS samples along diagonal
+    float delta = 1.f / nSamples;
+    for (uint32_t i = 0; i < nSamples; ++i)
+        for (uint32_t j = 0; j < nDim; ++j)
+            samples[nDim * i + j] = (i + (rng.RandomFloat())) * delta;
+
+    // Permute LHS samples in each dimension
+    for (uint32_t i = 0; i < nDim; ++i) {
+        for (uint32_t j = 0; j < nSamples; ++j) {
+            uint32_t other = j + (rng.RandomUInt() % (nSamples - j));
+            swap(samples[nDim * j + i], samples[nDim * other + i]);
+        }
+    }
+}
+
+
+int LDPixelSampleFloatsNeeded(const Sample *sample, int nPixelSamples) {
+    int n = 5; // 2 lens + 2 pixel + time
+    for (uint32_t i = 0; i < sample->n1D.size(); ++i)
+        n += sample->n1D[i];
+    for (uint32_t i = 0; i < sample->n2D.size(); ++i)
+        n += 2 * sample->n2D[i];
+    return nPixelSamples * n;
+}
+
+
+void LDPixelSample(int xPos, int yPos, float shutterOpen,
+        float shutterClose, int nPixelSamples, Sample *samples, float *buf,
+        RNG &rng) {
+    // Prepare temporary array pointers for low-discrepancy camera samples
+    float *imageSamples = buf; buf += 2 * nPixelSamples;
+    float *lensSamples = buf;  buf += 2 * nPixelSamples;
+    float *timeSamples = buf;  buf += nPixelSamples;
+
+    // Prepare temporary array pointers for low-discrepancy integrator samples
+    uint32_t count1D = samples[0].n1D.size();
+    uint32_t count2D = samples[0].n2D.size();
+    const uint32_t *n1D = count1D > 0 ? &samples[0].n1D[0] : NULL;
+    const uint32_t *n2D = count2D > 0 ? &samples[0].n2D[0] : NULL;
+    float **oneDSamples = ALLOCA(float *, count1D);
+    float **twoDSamples = ALLOCA(float *, count2D);
+    for (uint32_t i = 0; i < count1D; ++i) {
+        oneDSamples[i] = buf;
+        buf += n1D[i] * nPixelSamples;
+    }
+    for (uint32_t i = 0; i < count2D; ++i) {
+        twoDSamples[i] = buf;
+        buf += 2 * n2D[i] * nPixelSamples;
+    }
+
+    // Generate low-discrepancy pixel samples
+    LDShuffleScrambled2D(1, nPixelSamples, imageSamples, rng);
+    LDShuffleScrambled2D(1, nPixelSamples, lensSamples, rng);
+    LDShuffleScrambled1D(1, nPixelSamples, timeSamples, rng);
+    for (uint32_t i = 0; i < count1D; ++i)
+        LDShuffleScrambled1D(n1D[i], nPixelSamples, oneDSamples[i], rng);
+    for (uint32_t i = 0; i < count2D; ++i)
+        LDShuffleScrambled2D(n2D[i], nPixelSamples, twoDSamples[i], rng);
+
+    // Initialize _samples_ with computed sample values
+    for (int i = 0; i < nPixelSamples; ++i) {
+        samples[i].imageX = xPos + imageSamples[2*i];
+        samples[i].imageY = yPos + imageSamples[2*i+1];
+        samples[i].time = Lerp(timeSamples[i], shutterOpen, shutterClose);
+        samples[i].lensU = lensSamples[2*i];
+        samples[i].lensV = lensSamples[2*i+1];
+        // Copy integrator samples into _samples[i]_
+        for (uint32_t j = 0; j < count1D; ++j) {
+            int startSamp = n1D[j] * i;
+            for (uint32_t k = 0; k < n1D[j]; ++k)
+                samples[i].oneD[j][k] = oneDSamples[j][startSamp+k];
+        }
+        for (uint32_t j = 0; j < count2D; ++j) {
+            int startSamp = 2 * n2D[j] * i;
+            for (uint32_t k = 0; k < 2*n2D[j]; ++k)
+                samples[i].twoD[j][k] = twoDSamples[j][startSamp+k];
+        }
+    }
+}
+
+
+
+// Monte Carlo Function Definitions
+void RejectionSampleDisk(float *x, float *y, RNG &rng) {
+    float sx, sy;
+    do {
+        sx = 1.f - 2.f * rng.RandomFloat();
+        sy = 1.f - 2.f * rng.RandomFloat();
+    } while (sx*sx + sy*sy > 1.f);
+    *x = sx;
+    *y = sy;
+}
+
+
+Vector UniformSampleHemisphere(float u1, float u2) {
+    float z = u1;
+    float r = sqrtf(max(0.f, 1.f - z*z));
+    float phi = 2 * M_PI * u2;
+    float x = r * cosf(phi);
+    float y = r * sinf(phi);
+    return Vector(x, y, z);
+}
+
+
+float UniformHemispherePdf() {
+    return INV_TWOPI;
+}
+
+
+Vector UniformSampleSphere(float u1, float u2) {
+    float z = 1.f - 2.f * u1;
+    float r = sqrtf(max(0.f, 1.f - z*z));
+    float phi = 2.f * M_PI * u2;
+    float x = r * cosf(phi);
+    float y = r * sinf(phi);
+    return Vector(x, y, z);
+}
+
+
+float UniformSpherePdf() {
+    return 1.f / (4.f * M_PI);
+}
+
+
+void UniformSampleDisk(float u1, float u2, float *x, float *y) {
+    float r = sqrtf(u1);
+    float theta = 2.0f * M_PI * u2;
+    *x = r * cosf(theta);
+    *y = r * sinf(theta);
+}
+
+
+void ConcentricSampleDisk(float u1, float u2, float *dx, float *dy) {
+    float r, theta;
+    // Map uniform random numbers to $[-1,1]^2$
+    float sx = 2 * u1 - 1;
+    float sy = 2 * u2 - 1;
+
+    // Map square to $(r,\theta)$
+
+    // Handle degeneracy at the origin
+    if (sx == 0.0 && sy == 0.0) {
+        *dx = 0.0;
+        *dy = 0.0;
+        return;
+    }
+    if (sx >= -sy) {
+        if (sx > sy) {
+            // Handle first region of disk
+            r = sx;
+            if (sy > 0.0) theta = sy/r;
+            else          theta = 8.0f + sy/r;
+        }
+        else {
+            // Handle second region of disk
+            r = sy;
+            theta = 2.0f - sx/r;
+        }
+    }
+    else {
+        if (sx <= sy) {
+            // Handle third region of disk
+            r = -sx;
+            theta = 4.0f - sy/r;
+        }
+        else {
+            // Handle fourth region of disk
+            r = -sy;
+            theta = 6.0f + sx/r;
+        }
+    }
+    theta *= M_PI / 4.f;
+    *dx = r * cosf(theta);
+    *dy = r * sinf(theta);
+}
+
+
+void UniformSampleTriangle(float u1, float u2, float *u, float *v) {
+    float su1 = sqrtf(u1);
+    *u = 1.f - su1;
+    *v = u2 * su1;
+}
+
+
+Distribution2D::Distribution2D(const float *func, int nu, int nv) {
+    pConditionalV.reserve(nv);
+    for (int v = 0; v < nv; ++v) {
+        // Compute conditional sampling distribution for $\tilde{v}$
+        pConditionalV.push_back(new Distribution1D(&func[v*nu], nu));
+    }
+    // Compute marginal sampling distribution $p[\tilde{v}]$
+    vector<float> marginalFunc;
+    marginalFunc.reserve(nv);
+    for (int v = 0; v < nv; ++v)
+        marginalFunc.push_back(pConditionalV[v]->funcInt);
+    pMarginal = new Distribution1D(&marginalFunc[0], nv);
+}
+
+
+Distribution2D::~Distribution2D() {
+    delete pMarginal;
+    for (uint32_t i = 0; i < pConditionalV.size(); ++i)
+        delete pConditionalV[i];
+}
+
+
+PermutedHalton::PermutedHalton(uint32_t d, RNG &rng) {
     dims = d;
-    bases = new u_int[dims];
-    u_int sumPrimes = 0;
-    for (u_int i = 0; i < dims; ++i) {
-        bases[i] = primes[i];
-        sumPrimes += bases[i];
+    // Determine bases $b_i$ and their sum
+    b = new uint32_t[dims];
+    uint32_t sumBases = 0;
+    for (uint32_t i = 0; i < dims; ++i) {
+        b[i] = primes[i];
+        sumBases += b[i];
     }
-    permute = new u_int[sumPrimes];
-    u_int *p = permute;
-    for (u_int i = 0; i < dims; ++i) {
-        GeneratePermutation(p, bases[i], rng);
-        p += bases[i];
+
+    // Compute permutation tables for each base
+    permute = new uint32_t[sumBases];
+    uint32_t *p = permute;
+    for (uint32_t i = 0; i < dims; ++i) {
+        GeneratePermutation(p, b[i], rng);
+        p += b[i];
     }
-}
-
-
-void SampleBlinn(const Vector &wo, Vector *wi, float u1, float u2, float *pdf,
-        float exponent) {
-    // Compute sampled half-angle vector $\wh$ for Blinn distribution
-    float costheta = powf(u1, 1.f / (exponent+1));
-    float sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
-    float phi = u2 * 2.f * M_PI;
-    Vector wh = SphericalDirection(sintheta, costheta, phi);
-    if (!SameHemisphere(wo, wh)) wh = -wh;
-
-    // Compute incident direction by reflecting about $\wh$
-    *wi = -wo + 2.f * Dot(wo, wh) * wh;
-
-    // Compute PDF for $\wi$ from Blinn distribution
-    float blinn_pdf = ((exponent + 1.f) * powf(costheta, exponent)) /
-                      (2.f * M_PI * 4.f * Dot(wo, wh));
-    if (Dot(wo, wh) < 0.f) blinn_pdf = 0.f;
-    *pdf = blinn_pdf;
-}
-
-
-float BlinnPdf(const Vector &wo, const Vector &wi, float exponent) {
-    Vector wh = Normalize(wo + wi);
-    float costheta = fabsf(wh.z);
-    // Compute PDF for $\wi$ from Blinn distribution
-    float blinn_pdf = ((exponent + 1.f) * powf(costheta, exponent)) /
-                      (2.f * M_PI * 4.f * Dot(wo, wh));
-    if (Dot(wo, wh) < 0.f) blinn_pdf = 0.f;
-    return blinn_pdf;
 }
 
 
@@ -444,9 +394,7 @@ Vector UniformSampleCone(float u1, float u2, float costhetamax) {
     float costheta = (1.f - u1) + u1 * costhetamax;
     float sintheta = sqrtf(1.f - costheta*costheta);
     float phi = u2 * 2.f * M_PI;
-    return Vector(cosf(phi) * sintheta,
-                  sinf(phi) * sintheta,
-                  costheta);
+    return Vector(cosf(phi) * sintheta, sinf(phi) * sintheta, costheta);
 }
 
 
@@ -466,7 +414,7 @@ Vector SampleHG(const Vector &w, float g, float u1, float u2) {
         costheta = 1.f - 2.f * u1;
     else {
         float sqrTerm = (1.f - g * g) /
-                (1.f - g + 2.f * g * u1);
+                        (1.f - g + 2.f * g * u1);
         costheta = (1.f + g * g - sqrTerm * sqrTerm) / (2.f * g);
     }
     float sintheta = sqrtf(max(0.f, 1.f-costheta*costheta));

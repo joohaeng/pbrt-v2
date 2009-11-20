@@ -34,40 +34,35 @@ Sampler::~Sampler() {
 
 
 Sampler::Sampler(int xstart, int xend, int ystart, int yend, int spp,
-        float sopen, float sclose) {
-    xPixelStart = xstart;
-    xPixelEnd = xend;
-    yPixelStart = ystart;
-    yPixelEnd = yend;
-    SamplesPerPixel = spp;
-    ShutterOpen = sopen;
-    ShutterClose = sclose;
-}
-
-
-void Sampler::ComputeSubWindow(int num, int count,
-        int *newXStart, int *newXEnd, int *newYStart, int *newYEnd) const {
-   int nx = count, ny = 1;
-   while ((nx & 0x1) == 0 && nx > ny) {
-       nx >>= 1;
-       ny <<= 1;
-   }
-   Assert(nx * ny == count);
-
-   int xo = num % nx, yo = num / nx;
-   float tx0 = float(xo) / float(nx), tx1 = float(xo+1) / float(nx);
-   float ty0 = float(yo) / float(ny), ty1 = float(yo+1) / float(ny);
-   *newXStart = Floor2Int(Lerp(tx0, xPixelStart, xPixelEnd));
-   *newXEnd   = Floor2Int(Lerp(tx1, xPixelStart, xPixelEnd));
-   *newYStart = Floor2Int(Lerp(ty0, yPixelStart, yPixelEnd));
-   *newYEnd   = Floor2Int(Lerp(ty1, yPixelStart, yPixelEnd));
-}
-
-
+                 float sopen, float sclose)
+    : xPixelStart(xstart), xPixelEnd(xend), yPixelStart(ystart),
+      yPixelEnd(yend), samplesPerPixel(spp), shutterOpen(sopen),
+      shutterClose(sclose) { }
 bool Sampler::ReportResults(Sample *samples, const RayDifferential *rays,
-        const Spectrum *Ls, const Intersection *isects,
-        int count) {
+        const Spectrum *Ls, const Intersection *isects, int count) {
     return true;
+}
+
+
+void Sampler::ComputeSubWindow(int num, int count, int *newXStart,
+        int *newXEnd, int *newYStart, int *newYEnd) const {
+    // Determine how many tiles to use in each dimension, _nx_ and _ny_
+    int dx = xPixelEnd - xPixelStart, dy = yPixelEnd - yPixelStart;
+    int nx = count, ny = 1;
+    while ((nx & 0x1) == 0 && dx * nx > dy * ny) {
+        nx >>= 1;
+        ny <<= 1;
+    }
+    Assert(nx * ny == count);
+
+    // Compute $x$ and $y$ pixel sample range for sub-window
+    int xo = num % nx, yo = num / nx;
+    float tx0 = float(xo) / float(nx), tx1 = float(xo+1) / float(nx);
+    float ty0 = float(yo) / float(ny), ty1 = float(yo+1) / float(ny);
+    *newXStart = Floor2Int(Lerp(tx0, xPixelStart, xPixelEnd));
+    *newXEnd   = Floor2Int(Lerp(tx1, xPixelStart, xPixelEnd));
+    *newYStart = Floor2Int(Lerp(ty0, yPixelStart, yPixelEnd));
+    *newYEnd   = Floor2Int(Lerp(ty1, yPixelStart, yPixelEnd));
 }
 
 
@@ -93,31 +88,30 @@ void Sample::AllocateSampleMemory() {
 
     // Compute total number of sample values needed
     int totSamples = 0;
-    for (u_int i = 0; i < n1D.size(); ++i)
+    for (uint32_t i = 0; i < n1D.size(); ++i)
         totSamples += n1D[i];
-    for (u_int i = 0; i < n2D.size(); ++i)
+    for (uint32_t i = 0; i < n2D.size(); ++i)
         totSamples += 2 * n2D[i];
 
     // Allocate storage for sample values
     float *mem = AllocAligned<float>(totSamples);
-    for (u_int i = 0; i < n1D.size(); ++i) {
+    for (uint32_t i = 0; i < n1D.size(); ++i) {
         oneD[i] = mem;
         mem += n1D[i];
     }
-    for (u_int i = 0; i < n2D.size(); ++i) {
+    for (uint32_t i = 0; i < n2D.size(); ++i) {
         twoD[i] = mem;
         mem += 2 * n2D[i];
     }
 }
 
 
-Sample *Sample::Duplicate(int count, RNG &rng) const {
+Sample *Sample::Duplicate(int count) const {
     Sample *ret = new Sample[count];
     for (int i = 0; i < count; ++i) {
         ret[i].n1D = n1D;
         ret[i].n2D = n2D;
         ret[i].AllocateSampleMemory();
-        ret[i].rng = &rng;
     }
     return ret;
 }

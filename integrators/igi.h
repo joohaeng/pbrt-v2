@@ -49,16 +49,19 @@ public:
     ~IGIIntegrator();
     Spectrum Li(const Scene *scene, const Renderer *renderer,
         const RayDifferential &ray, const Intersection &isect,
-        const Sample *sample, MemoryArena &arena) const;
+        const Sample *sample, RNG &rng, MemoryArena &arena) const;
     void RequestSamples(Sampler *sampler, Sample *sample, const Scene *scene);
     void Preprocess(const Scene *, const Camera *, const Renderer *);
-    IGIIntegrator(u_int nl, u_int ns, float mind, float rrt, int maxd) {
+    IGIIntegrator(uint32_t nl, uint32_t ns, float mind, float rrt, int maxd,
+            float gl, int ng) {
         nLightPaths = RoundUpPow2(nl);
         nLightSets = RoundUpPow2(ns);
         minDist2 = mind * mind;
         rrThreshold = rrt;
         maxSpecularDepth = maxd;
         virtualLights.resize(nLightSets);
+        gLimit = gl;
+        nGatherSamples = ng;
         lightSampleOffsets = NULL;
         bsdfSampleOffsets = NULL;
     }
@@ -68,11 +71,12 @@ private:
     // Declare sample parameters for light source sampling
     LightSampleOffsets *lightSampleOffsets;
     BSDFSampleOffsets *bsdfSampleOffsets;
-    u_int nLightPaths, nLightSets;
+    uint32_t nLightPaths, nLightSets;
     vector<vector<VirtualLight> > virtualLights;
-    int maxSpecularDepth;
-    float minDist2, rrThreshold;
+    int maxSpecularDepth, nGatherSamples;
+    float minDist2, rrThreshold, gLimit;
     int vlSetOffset;
+    BSDFSampleOffsets gatherSampleOffset;
 };
 
 

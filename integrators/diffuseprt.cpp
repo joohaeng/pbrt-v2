@@ -51,7 +51,7 @@ void DiffusePRTIntegrator::Preprocess(const Scene *scene,
     Point p = .5f * bbox.pMin + .5f * bbox.pMax;
     RNG rng;
     MemoryArena arena;
-    SHProjectIncidentDirectRadiance(p, 0.f, camera->ShutterOpen, arena,
+    SHProjectIncidentDirectRadiance(p, 0.f, camera->shutterOpen, arena,
         scene, false, lmax, rng, c_in);
 }
 
@@ -62,7 +62,7 @@ void DiffusePRTIntegrator::RequestSamples(Sampler *sampler, Sample *sample, cons
 
 Spectrum DiffusePRTIntegrator::Li(const Scene *scene, const Renderer *,
             const RayDifferential &ray, const Intersection &isect,
-            const Sample *sample, MemoryArena &arena) const {
+            const Sample *sample, RNG &rng, MemoryArena &arena) const {
     Spectrum L = 0.f;
     Vector wo = -ray.d;
     // Compute emitted light if ray hit an area light source
@@ -76,8 +76,8 @@ Spectrum DiffusePRTIntegrator::Li(const Scene *scene, const Renderer *,
 
     // Project diffuse transfer function at point to SH
     Spectrum *c_transfer = arena.Alloc<Spectrum>(SHTerms(lmax));
-    SHComputeDiffuseTransfer(p, Faceforward(n, wo), isect.RayEpsilon,
-        scene, *sample->rng, nSamples, lmax, c_transfer);
+    SHComputeDiffuseTransfer(p, Faceforward(n, wo), isect.rayEpsilon,
+        scene, rng, nSamples, lmax, c_transfer);
 
     // Compute integral of product of incident radiance and transfer function
     Spectrum LT = 0.f;
@@ -87,7 +87,7 @@ Spectrum DiffusePRTIntegrator::Li(const Scene *scene, const Renderer *,
     // Compute reflectance at point for diffuse transfer
     const int sqrtRhoSamples = 6;
     float rhoRSamples[2*sqrtRhoSamples*sqrtRhoSamples];
-    StratifiedSample2D(rhoRSamples, sqrtRhoSamples, sqrtRhoSamples, *sample->rng);
+    StratifiedSample2D(rhoRSamples, sqrtRhoSamples, sqrtRhoSamples, rng);
     Spectrum Kd = bsdf->rho(wo, sqrtRhoSamples*sqrtRhoSamples, rhoRSamples,
         BSDF_ALL_REFLECTION) * INV_PI;
     return L + Kd * LT.Clamp();

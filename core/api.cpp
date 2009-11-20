@@ -40,13 +40,13 @@
 #include "cameras/environment.h"
 #include "cameras/orthographic.h"
 #include "cameras/perspective.h"
-#include "cameras/realistic.h"
 #include "film/image.h"
 #include "filters/box.h"
 #include "filters/gaussian.h"
 #include "filters/mitchell.h"
 #include "filters/sinc.h"
 #include "filters/triangle.h"
+#include "integrators/ambientocclusion.h"
 #include "integrators/diffuseprt.h"
 #include "integrators/dipolesubsurface.h"
 #include "integrators/directlighting.h"
@@ -153,7 +153,7 @@ private:
 struct RenderOptions {
     // RenderOptions Public Methods
     RenderOptions();
-    Scene *MakeScene() const;
+    Scene *MakeScene();
     Camera *MakeCamera() const;
     Renderer *MakeRenderer() const;
 
@@ -174,8 +174,8 @@ struct RenderOptions {
     string CameraName;
     ParamSet CameraParams;
     TransformSet CameraToWorld;
-    mutable vector<Light *> lights;
-    mutable vector<Reference<Primitive> > primitives;
+    vector<Light *> lights;
+    vector<Reference<Primitive> > primitives;
     mutable vector<VolumeRegion *> volumeRegions;
     map<string, vector<Reference<Primitive> > > instances;
     vector<Reference<Primitive> > *currentInstance;
@@ -190,7 +190,7 @@ RenderOptions::RenderOptions() {
     FilmName = "image";
     SamplerName = "lowdiscrepancy";
     AcceleratorName = "bvh";
-    RendererName = "standard";
+    RendererName = "sample";
     SurfIntegratorName = "directlighting";
     VolIntegratorName = "emission";
     CameraName = "perspective";
@@ -265,7 +265,7 @@ static RenderOptions *renderOptions = NULL;
 static GraphicsState graphicsState;
 static vector<GraphicsState> pushedGraphicsStates;
 static vector<TransformSet> pushedTransforms;
-static vector<u_int> pushedActiveTransformBits;
+static vector<uint32_t> pushedActiveTransformBits;
 static TransformCache transformCache;
 
 // API Macros
@@ -547,6 +547,8 @@ SurfaceIntegrator *MakeSurfaceIntegrator(const string &name,
         si = CreateIGISurfaceIntegrator(paramSet);
     else if (name == "dipolesubsurface")
         si = CreateDipoleSubsurfaceIntegrator(paramSet);
+    else if (name == "ambientocclusion")
+        si = CreateAmbientOcclusionIntegrator(paramSet);
     else if (name == "useprobes")
         si = CreateRadianceProbesSurfaceIntegrator(paramSet);
     else if (name == "diffuseprt")
@@ -611,8 +613,6 @@ Camera *MakeCamera(const string &name,
         camera = CreateOrthographicCamera(paramSet, animatedCam2World, film);
     else if (name == "environment")
         camera = CreateEnvironmentCamera(paramSet, animatedCam2World, film);
-    else if (name == "realistic")
-        camera = CreateRealisticCamera(paramSet, animatedCam2World, film);
     else
         Warning("Camera \"%s\" unknown.", name.c_str());
     paramSet.ReportUnused();
@@ -974,8 +974,7 @@ void pbrtLightSource(const string &name, const ParamSet &params) {
     WARN_IF_ANIMATED_TRANSFORM("LightSource");
     Light *lt = MakeLight(name, curTransform[0], params);
     if (lt == NULL)
-        Error("pbrtLightSource: light type "
-              "\"%s\" unknown.", name.c_str());
+        Error("pbrtLightSource: light type \"%s\" unknown.", name.c_str());
     else
         renderOptions->lights.push_back(lt);
 }
@@ -1055,7 +1054,6 @@ void pbrtShape(const string &name, const ParamSet &params) {
     else {
         renderOptions->primitives.push_back(prim);
         if (area != NULL) {
-            // Add area light for primitive to light vector
             renderOptions->lights.push_back(area);
         }
     }
@@ -1186,7 +1184,7 @@ void pbrtWorldEnd() {
 }
 
 
-Scene *RenderOptions::MakeScene() const {
+Scene *RenderOptions::MakeScene() {
     // Initialize _volumeRegion_ from volume region(s)
     VolumeRegion *volumeRegion;
     if (volumeRegions.size() == 0)
@@ -1219,7 +1217,7 @@ Renderer *RenderOptions::MakeRenderer() const {
     }
     // Create remaining \use{Renderer} types
     else if (RendererName == "createprobes") {
-        Point pCamera = camera->CameraToWorld(camera->ShutterOpen, Point(0, 0, 0));
+        Point pCamera = camera->CameraToWorld(camera->shutterOpen, Point(0, 0, 0));
         renderer = CreateRadianceProbesRenderer(pCamera, RendererParams);
         RendererParams.ReportUnused();
     }
@@ -1228,7 +1226,7 @@ Renderer *RenderOptions::MakeRenderer() const {
         RendererParams.ReportUnused();
     }
     else {
-        if (RendererName != "standard")
+        if (RendererName != "sample")
             Warning("Renderer type \"%s\" unknown.  Using standard.",
                     RendererName.c_str());
         RendererParams.ReportUnused();
