@@ -84,6 +84,7 @@
 #include "renderers/createprobes.h"
 #include "renderers/metropolis.h"
 #include "renderers/sample.h"
+#include "renderers/surfacepoints.h"
 #include "samplers/adaptive.h"
 #include "samplers/bestcandidate.h"
 #include "samplers/halton.h"
@@ -121,6 +122,9 @@
  #define snprintf _snprintf
  #endif
 using std::map;
+
+// API Global Variables
+Options PbrtOptions;
 
 // API Local Classes
 #define MAX_TRANSFORMS 2
@@ -676,7 +680,8 @@ Film *MakeFilm(const string &name,
 
 
 // API Function Definitions
-void pbrtInit() {
+void pbrtInit(const Options &opt) {
+    PbrtOptions = opt;
     // API Initialization
     if (currentApiState != STATE_UNINITIALIZED)
         Error("pbrtInit() has already been called.");
@@ -1217,12 +1222,23 @@ Renderer *RenderOptions::MakeRenderer() const {
     }
     // Create remaining \use{Renderer} types
     else if (RendererName == "createprobes") {
-        Point pCamera = camera->CameraToWorld(camera->shutterOpen, Point(0, 0, 0));
-        renderer = CreateRadianceProbesRenderer(pCamera, RendererParams);
+        // Create surface and volume integrators
+        SurfaceIntegrator *surfaceIntegrator = MakeSurfaceIntegrator(SurfIntegratorName,
+            SurfIntegratorParams);
+        if (!surfaceIntegrator) Severe("Unable to create surface integrator.");
+        VolumeIntegrator *volumeIntegrator = MakeVolumeIntegrator(VolIntegratorName,
+            VolIntegratorParams);
+        if (!volumeIntegrator) Severe("Unable to create volume integrator.");
+        renderer = CreateRadianceProbesRenderer(camera, surfaceIntegrator, volumeIntegrator, RendererParams);
         RendererParams.ReportUnused();
     }
     else if (RendererName == "aggregatetest") {
         renderer = CreateAggregateTestRenderer(RendererParams, primitives);
+        RendererParams.ReportUnused();
+    }
+    else if (RendererName == "surfacepoints") {
+        Point pCamera = camera->CameraToWorld(camera->shutterOpen, Point(0, 0, 0));
+        renderer = CreateSurfacePointsRenderer(RendererParams, pCamera, camera->shutterOpen);
         RendererParams.ReportUnused();
     }
     else {
@@ -1232,6 +1248,7 @@ Renderer *RenderOptions::MakeRenderer() const {
         RendererParams.ReportUnused();
         Sampler *sampler = MakeSampler(SamplerName, SamplerParams, camera->film, camera);
         if (!sampler) Severe("Unable to create sampler.");
+        // Create surface and volume integrators
         SurfaceIntegrator *surfaceIntegrator = MakeSurfaceIntegrator(SurfIntegratorName,
             SurfIntegratorParams);
         if (!surfaceIntegrator) Severe("Unable to create surface integrator.");

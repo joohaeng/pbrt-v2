@@ -52,7 +52,7 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     Fresnel *f21 = BSDF_ALLOC(arena, FresnelDielectric)(eta_t, eta_i);
 
     Spectrum a = absorption->Evaluate(dgShading).Clamp();
-    float d = thickness->Evaluate(dgShading);
+    float d = thickness;
 
     // Create a layered material on top of base b2 considering the paramters of coating b1: 
 	// Fresnel, absorption, depth
@@ -76,14 +76,13 @@ LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
         const TextureParams &mp, const Reference<Material> &m1,
         const Reference<Material> &m2) {
 	// ior of m1 (coating layer): default 1.5 for glass
-    float ior = mp.FindFloat("ior", float(1.5f)); 
-    //Reference<Texture<float> > ior = mp.GetFloatTexture("ior", float(1.5f)); 
+    float ior 	= mp.FindFloat("ior", float(1.5f));
+    float d 	= mp.FindFloat("thickness", float(1.0f));
 	// 1.0f for TIR computation, otherwise for no consideration
     Reference<Texture<float> > tir = mp.GetFloatTexture("tir", float(1.0f)); 
 	// 0.0f to flat normal rather than microfacet normal
     Reference<Texture<float> > mfnormal = mp.GetFloatTexture("mfnormal", float(1.0f)); 
     Reference<Texture<float> > baseonly = mp.GetFloatTexture("baseonly", float(0.0f)); 
-    Reference<Texture<float> > d = mp.GetFloatTexture("thickness", float(1.0f));
     Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.1));
     return new LayeredMaterial(m1, m2, ior, d, a, tir, mfnormal, baseonly);
 }

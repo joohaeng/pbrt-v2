@@ -35,7 +35,7 @@ public:
     LayeredMaterial(const Reference<Material> &mat1, const Reference<Material> &mat2,
                 //const Reference<Texture<float> > &ior_,
                 float ior_,
-                const Reference<Texture<float> > &d,
+                float thickness_,
                 const Reference<Texture<Spectrum> > &a,
                 const Reference<Texture<float> > &tir_,
                 const Reference<Texture<float> > &mf_normal_,
@@ -45,7 +45,7 @@ public:
         m1 = mat1;
         m2 = mat2;
         ior = ior_;
-        thickness = d;
+        thickness = thickness_;
         absorption = a;
         tir = tir_;
         mf_normal = mf_normal_;
@@ -59,10 +59,10 @@ private:
     Reference<Material> m1, m2;
     //Reference<Texture<float> > 	ior;
     float ior;
+    float thickness;
     Reference<Texture<float> > 	tir; // 1 for TIR computation, otherwise for no consideration.
     Reference<Texture<float> > 	mf_normal; // 0 to select a surface normal rather than a MF normal
     Reference<Texture<float> > 	base_only; // 0 to select a surface normal rather than a MF normal
-    Reference<Texture<float> > 	thickness;
     Reference<Texture<Spectrum> > absorption;
 };
 

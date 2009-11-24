@@ -225,15 +225,8 @@ Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
                     Lt += (k / (nPaths * maxDistSquared)) * photons[i].photon->alpha;
                 }
             }
-            const int sqrtRhoSamples = 4;
-            float rhoRSamples[2*sqrtRhoSamples*sqrtRhoSamples];
-            StratifiedSample2D(rhoRSamples, sqrtRhoSamples, sqrtRhoSamples, rng);
-            float rhoTSamples[2*sqrtRhoSamples*sqrtRhoSamples];
-            StratifiedSample2D(rhoTSamples, sqrtRhoSamples, sqrtRhoSamples, rng);
-            L += Lr * bsdf->rho(wo, sqrtRhoSamples*sqrtRhoSamples, rhoRSamples,
-                                BSDF_ALL_REFLECTION) * INV_PI +
-                 Lt * bsdf->rho(wo, sqrtRhoSamples*sqrtRhoSamples, rhoTSamples,
-                                BSDF_ALL_TRANSMISSION) * INV_PI;
+            L += Lr * bsdf->rho(wo, rng, BSDF_ALL_REFLECTION) * INV_PI +
+                 Lt * bsdf->rho(wo, rng, BSDF_ALL_TRANSMISSION) * INV_PI;
         }
         PBRT_PHOTON_MAP_FINISHED_LOOKUP(const_cast<DifferentialGeometry *>(&isect.dg),
             proc.nFound, proc.nLookup, &L);
@@ -462,23 +455,8 @@ void PhotonShootingTask::Run() {
                             Normal n = photonIsect.dg.nn;
                             n = Faceforward(n, -photonRay.d);
                             localRadiancePhotons.push_back(RadiancePhoton(photonIsect.dg.p, n));
-
-                            // Generate random samples for computing reflectance and transmittance
-                            const int sqrtRhoSamples = 4;
-                            float rhoRSamples1[2*sqrtRhoSamples*sqrtRhoSamples];
-                            float rhoRSamples2[2*sqrtRhoSamples*sqrtRhoSamples];
-                            StratifiedSample2D(rhoRSamples1, sqrtRhoSamples, sqrtRhoSamples, rng);
-                            StratifiedSample2D(rhoRSamples2, sqrtRhoSamples, sqrtRhoSamples, rng);
-                            float rhoTSamples1[2*sqrtRhoSamples*sqrtRhoSamples];
-                            float rhoTSamples2[2*sqrtRhoSamples*sqrtRhoSamples];
-                            StratifiedSample2D(rhoTSamples1, sqrtRhoSamples, sqrtRhoSamples, rng);
-                            StratifiedSample2D(rhoTSamples2, sqrtRhoSamples, sqrtRhoSamples, rng);
-                            Spectrum rho_r = photonBSDF->rho(sqrtRhoSamples * sqrtRhoSamples,
-                                rhoRSamples1, rhoRSamples2, BSDF_ALL_REFLECTION);
-                            localRpReflectances.push_back(rho_r);
-                            Spectrum rho_t = photonBSDF->rho(sqrtRhoSamples * sqrtRhoSamples,
-                                rhoTSamples1, rhoTSamples2, BSDF_ALL_TRANSMISSION);
-                            localRpTransmittances.push_back(rho_t);
+                            localRpReflectances.push_back(photonBSDF->rho(rng, BSDF_ALL_REFLECTION));
+                            localRpTransmittances.push_back(photonBSDF->rho(rng, BSDF_ALL_TRANSMISSION));
                         }
                     }
                     if ((int)nIntersections >= integrator->maxPhotonDepth) break;
@@ -763,10 +741,8 @@ Spectrum PhotonIntegrator::Li(const Scene *scene, const Renderer *renderer,
     if (ray.depth+1 < maxSpecularDepth) {
         Vector wi;
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, bsdf, rng, isect, renderer,
-                             scene, sample, arena);
-        L += SpecularTransmit(ray, bsdf, rng, isect, renderer,
-                              scene, sample, arena);
+        L += SpecularReflect(ray, bsdf, rng, isect, renderer, scene, sample, arena);
+        L += SpecularTransmit(ray, bsdf, rng, isect, renderer, scene, sample, arena);
     }
     return L;
 }
@@ -796,14 +772,14 @@ PhotonIntegrator *CreatePhotonMapSurfaceIntegrator(const ParamSet &params) {
     int nCaustic = params.FindOneInt("causticphotons", 20000);
     int nIndirect = params.FindOneInt("indirectphotons", 100000);
     int nUsed = params.FindOneInt("nused", 50);
-    if (getenv("PBRT_QUICK_RENDER")) nCaustic = nCaustic / 10;
-    if (getenv("PBRT_QUICK_RENDER")) nIndirect = nIndirect / 10;
-    if (getenv("PBRT_QUICK_RENDER")) nUsed = max(1, nUsed / 10);
+    if (PbrtOptions.quickRender) nCaustic = nCaustic / 10;
+    if (PbrtOptions.quickRender) nIndirect = nIndirect / 10;
+    if (PbrtOptions.quickRender) nUsed = max(1, nUsed / 10);
     int maxSpecularDepth = params.FindOneInt("maxspeculardepth", 5);
     int maxPhotonDepth = params.FindOneInt("maxphotondepth", 5);
     bool finalGather = params.FindOneBool("finalgather", true);
     int gatherSamples = params.FindOneInt("finalgathersamples", 32);
-    if (getenv("PBRT_QUICK_RENDER")) gatherSamples = max(1, gatherSamples / 4);
+    if (PbrtOptions.quickRender) gatherSamples = max(1, gatherSamples / 4);
     float maxDist = params.FindOneFloat("maxdist", .1f);
     float gatherAngle = params.FindOneFloat("gatherangle", 10.f);
     return new PhotonIntegrator(nCaustic, nIndirect,
