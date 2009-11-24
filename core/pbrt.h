@@ -74,24 +74,28 @@ using std::sort;
 // Global Macros
 #define ALLOCA(TYPE, COUNT) (TYPE *)alloca((COUNT) * sizeof(TYPE))
 
-// Global Type Declarations
-typedef unsigned char u_char;
-typedef unsigned short u_short;
-typedef unsigned int u_int;
-typedef unsigned long u_long;
-
 // Global Forward Declarations
+class RNG;
 class Timer;
 class ProgressReporter;
 class MemoryArena;
 template <typename T, int logBlockSize = 2> class BlockedArray;
 struct Matrix4x4;
-class RNG;
 class Mutex;
 class RWMutex;
 class Shape;
 class ParamSet;
 template <typename T> struct ParamSetItem;
+struct Options {
+    Options() { nCores = 0; quickRender = quiet = openWindow = false; }
+    int nCores;
+    bool quickRender;
+    bool quiet;
+    bool openWindow;
+};
+
+
+extern Options PbrtOptions;
 class TextureParams;
 class Scene;
 class Renderer;
@@ -110,7 +114,7 @@ template <int nSamples> class CoefficientSpectrum;
 class RGBSpectrum;
 class SampledSpectrum;
 typedef RGBSpectrum Spectrum;
-//typedef SampledSpectrum Spectrum;
+// typedef SampledSpectrum Spectrum;
 class Camera;
 class ProjectiveCamera;
 class Sampler;
@@ -140,32 +144,24 @@ class Integrator;
 class VolumeIntegrator;
 
 // Global Constants
-#define PBRT_VERSION "2.0alpha1"
+#define PBRT_VERSION "2.0 beta 1"
+#ifdef M_PI
+#undef M_PI
+#endif
+#define M_PI       3.14159265358979323846f
+#define INV_PI     0.31830988618379067154f
+#define INV_TWOPI  0.15915494309189533577f
+#ifndef INFINITY
+#define INFINITY FLT_MAX
+#endif
 #ifdef WIN32
 #define alloca _alloca
 #endif
 #ifndef PBRT_L1_CACHE_LINE_SIZE
 #define PBRT_L1_CACHE_LINE_SIZE 64
 #endif
-#ifdef M_PI
-#undef M_PI
-#endif
-#define M_PI           3.14159265358979323846f
-#define INV_PI     0.31830988618379067154f
-#define INV_TWOPI  0.15915494309189533577f
-#ifndef INFINITY
-#define INFINITY FLT_MAX
-#endif
 
 // Global Inline Functions
-#ifdef NDEBUG
-#define Assert(expr) ((void)0)
-#else
-#define Assert(expr) \
-    ((expr) ? (void)0 : \
-        Severe("Assertion \"%s\" failed in %s, line %d", \
-               #expr, __FILE__, __LINE__))
-#endif // NDEBUG
 inline float Lerp(float t, float v1, float v2) {
     return (1.f - t) * v1 + t * v2;
 }
@@ -220,12 +216,10 @@ inline bool IsPowerOf2(int v) {
 }
 
 
-inline u_int RoundUpPow2(u_int v) {
+inline uint32_t RoundUpPow2(uint32_t v) {
     v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
+    v |= v >> 1;    v |= v >> 2;
+    v |= v >> 4;    v |= v >> 8;
     v |= v >> 16;
     return v+1;
 }
@@ -251,6 +245,14 @@ inline int Ceil2Int(float val) {
 }
 
 
+#ifdef NDEBUG
+#define Assert(expr) ((void)0)
+#else
+#define Assert(expr) \
+    ((expr) ? (void)0 : \
+        Severe("Assertion \"%s\" failed in %s, line %d", \
+               #expr, __FILE__, __LINE__))
+#endif // NDEBUG
 inline bool Quadratic(float A, float B, float C, float *t0, float *t1) {
     // Find quadratic discriminant
     float discrim = B * B - 4.f * A * C;

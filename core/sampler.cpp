@@ -34,17 +34,10 @@ Sampler::~Sampler() {
 
 
 Sampler::Sampler(int xstart, int xend, int ystart, int yend, int spp,
-                 float sopen, float sclose) {
-    xPixelStart = xstart;
-    xPixelEnd = xend;
-    yPixelStart = ystart;
-    yPixelEnd = yend;
-    samplesPerPixel = spp;
-    shutterOpen = sopen;
-    shutterClose = sclose;
-}
-
-
+                 float sopen, float sclose)
+    : xPixelStart(xstart), xPixelEnd(xend), yPixelStart(ystart),
+      yPixelEnd(yend), samplesPerPixel(spp), shutterOpen(sopen),
+      shutterClose(sclose) { }
 bool Sampler::ReportResults(Sample *samples, const RayDifferential *rays,
         const Spectrum *Ls, const Intersection *isects, int count) {
     return true;
@@ -95,31 +88,30 @@ void Sample::AllocateSampleMemory() {
 
     // Compute total number of sample values needed
     int totSamples = 0;
-    for (u_int i = 0; i < n1D.size(); ++i)
+    for (uint32_t i = 0; i < n1D.size(); ++i)
         totSamples += n1D[i];
-    for (u_int i = 0; i < n2D.size(); ++i)
+    for (uint32_t i = 0; i < n2D.size(); ++i)
         totSamples += 2 * n2D[i];
 
     // Allocate storage for sample values
     float *mem = AllocAligned<float>(totSamples);
-    for (u_int i = 0; i < n1D.size(); ++i) {
+    for (uint32_t i = 0; i < n1D.size(); ++i) {
         oneD[i] = mem;
         mem += n1D[i];
     }
-    for (u_int i = 0; i < n2D.size(); ++i) {
+    for (uint32_t i = 0; i < n2D.size(); ++i) {
         twoD[i] = mem;
         mem += 2 * n2D[i];
     }
 }
 
 
-Sample *Sample::Duplicate(int count, RNG *rng) const {
+Sample *Sample::Duplicate(int count) const {
     Sample *ret = new Sample[count];
     for (int i = 0; i < count; ++i) {
         ret[i].n1D = n1D;
         ret[i].n2D = n2D;
         ret[i].AllocateSampleMemory();
-        ret[i].rng = rng;
     }
     return ret;
 }

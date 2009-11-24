@@ -58,8 +58,10 @@ public:
 class DensityRegion : public VolumeRegion {
 public:
     // DensityRegion Public Methods
-    DensityRegion(const Spectrum &sig_a, const Spectrum &sig_s,
-        float g, const Spectrum &Le, const Transform &VolumeToWorld);
+    DensityRegion(const Spectrum &sa, const Spectrum &ss, float gg,
+                  const Spectrum &emit, const Transform &VolumeToWorld)
+        : sig_a(sa), sig_s(ss), le(emit), g(gg),
+          WorldToVolume(Inverse(VolumeToWorld)) { }
     virtual float Density(const Point &Pobj) const = 0;
     Spectrum sigma_a(const Point &p, const Vector &, float) const {
         return Density(WorldToVolume(p)) * sig_a;
@@ -79,9 +81,9 @@ public:
     Spectrum tau(const Ray &r, float stepSize, float offset) const;
 protected:
     // DensityRegion Protected Data
-    Transform WorldToVolume;
     Spectrum sig_a, sig_s, le;
     float g;
+    Transform WorldToVolume;
 };
 
 
@@ -105,17 +107,17 @@ private:
 };
 
 
-bool GetVolumeScatteringProperties(const string &name, float *sigma_a,
-    float *sigma_prime_s);
+bool GetVolumeScatteringProperties(const string &name, Spectrum *sigma_a,
+                                   Spectrum *sigma_prime_s);
 class VolumeIntegrator : public Integrator {
 public:
     // VolumeIntegrator Interface
     virtual Spectrum Li(const Scene *scene, const Renderer *renderer,
-        const RayDifferential &ray, const Sample *sample,
+        const RayDifferential &ray, const Sample *sample, RNG &rng,
         Spectrum *transmittance, MemoryArena &arena) const = 0;
     virtual Spectrum Transmittance(const Scene *scene,
         const Renderer *renderer, const RayDifferential &ray,
-        const Sample *sample, RNG *rng, MemoryArena &arena) const = 0;
+        const Sample *sample, RNG &rng, MemoryArena &arena) const = 0;
 };
 
 

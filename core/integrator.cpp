@@ -37,12 +37,12 @@ Integrator::~Integrator() {
 // Integrator Utility Functions
 Spectrum UniformSampleAllLights(const Scene *scene,
         const Renderer *renderer, MemoryArena &arena, const Point &p,
-        const Normal &n, const Vector &wo, float rayEpsilon,
-        BSDF *bsdf, const Sample *sample,
+        const Normal &n, const Vector &wo, float rayEpsilon, float time,
+        BSDF *bsdf, const Sample *sample, RNG &rng,
         const LightSampleOffsets *lightSampleOffsets,
         const BSDFSampleOffsets *bsdfSampleOffsets) {
     Spectrum L(0.);
-    for (u_int i = 0; i < scene->lights.size(); ++i) {
+    for (uint32_t i = 0; i < scene->lights.size(); ++i) {
         Light *light = scene->lights[i];
         int nSamples = lightSampleOffsets ?
                        lightSampleOffsets[i].nSamples : 1;
@@ -57,11 +57,11 @@ Spectrum UniformSampleAllLights(const Scene *scene,
                 bsdfSample = BSDFSample(sample, bsdfSampleOffsets[i], j);
             }
             else {
-                lightSample = LightSample(*sample->rng);
-                bsdfSample = BSDFSample(*sample->rng);
+                lightSample = LightSample(rng);
+                bsdfSample = BSDFSample(rng);
             }
             Ld += EstimateDirect(scene, renderer, arena, light, p, n, wo,
-                rayEpsilon, sample->time, bsdf, sample->rng, lightSample, bsdfSample);
+                rayEpsilon, time, bsdf, rng, lightSample, bsdfSample);
         }
         L += Ld / nSamples;
     }
@@ -71,8 +71,8 @@ Spectrum UniformSampleAllLights(const Scene *scene,
 
 Spectrum UniformSampleOneLight(const Scene *scene,
         const Renderer *renderer, MemoryArena &arena, const Point &p,
-        const Normal &n, const Vector &wo, float rayEpsilon,
-        BSDF *bsdf, const Sample *sample, int lightNumOffset,
+        const Normal &n, const Vector &wo, float rayEpsilon, float time,
+        BSDF *bsdf, const Sample *sample, RNG &rng, int lightNumOffset,
         const LightSampleOffsets *lightSampleOffset,
         const BSDFSampleOffsets *bsdfSampleOffset) {
     // Randomly choose a single light to sample, _light_
@@ -82,7 +82,7 @@ Spectrum UniformSampleOneLight(const Scene *scene,
     if (lightNumOffset != -1)
         lightNum = Floor2Int(sample->oneD[lightNumOffset][0] * nLights);
     else
-        lightNum = Floor2Int(sample->rng->RandomFloat() * nLights);
+        lightNum = Floor2Int(rng.RandomFloat() * nLights);
     lightNum = min(lightNum, nLights-1);
     Light *light = scene->lights[lightNum];
 
@@ -94,19 +94,19 @@ Spectrum UniformSampleOneLight(const Scene *scene,
         bsdfSample = BSDFSample(sample, *bsdfSampleOffset, 0);
     }
     else {
-        lightSample = LightSample(*sample->rng);
-        bsdfSample = BSDFSample(*sample->rng);
+        lightSample = LightSample(rng);
+        bsdfSample = BSDFSample(rng);
     }
     return (float)nLights *
         EstimateDirect(scene, renderer, arena, light, p, n, wo,
-                       rayEpsilon, sample->time, bsdf, sample->rng, lightSample, bsdfSample);
+                       rayEpsilon, time, bsdf, rng, lightSample, bsdfSample);
 }
 
 
 Spectrum EstimateDirect(const Scene *scene, const Renderer *renderer,
         MemoryArena &arena, const Light *light, const Point &p,
         const Normal &n, const Vector &wo, float rayEpsilon, float time,
-        BSDF *bsdf, RNG *rng, const LightSample &lightSample,
+        BSDF *bsdf, RNG &rng, const LightSample &lightSample,
         const BSDFSample &bsdfSample) {
     Spectrum Ld(0.);
     // Sample light source with multiple importance sampling
@@ -149,7 +149,7 @@ Spectrum EstimateDirect(const Scene *scene, const Renderer *renderer,
                 else
                     Li = light->Le(ray);
                 if (!Li.IsBlack()) {
-                    Li *= renderer->Transmittance(scene, ray, NULL, arena, rng);
+                    Li *= renderer->Transmittance(scene, ray, NULL, rng, arena);
                     Ld += f * Li * AbsDot(wi, n) * weight / bsdfPdf;
                 }
             }
@@ -163,12 +163,13 @@ Spectrum SpecularReflect(const RayDifferential &ray, BSDF *bsdf,
         RNG &rng, const Intersection &isect, const Renderer *renderer,
         const Scene *scene, const Sample *sample, MemoryArena &arena) {
     Vector wo = -ray.d, wi;
+    float pdf;
     const Point &p = bsdf->dgShading.p;
     const Normal &n = bsdf->dgShading.nn;
-    Spectrum f = bsdf->Sample_f(wo, &wi, rng,
-        BxDFType(BSDF_REFLECTION | BSDF_SPECULAR));
+    Spectrum f = bsdf->Sample_f(wo, &wi, BSDFSample(rng), &pdf,
+                                BxDFType(BSDF_REFLECTION | BSDF_SPECULAR));
     Spectrum L = 0.f;
-    if (!f.IsBlack() && AbsDot(wi, n) != 0.f) {
+    if (pdf > 0.f && !f.IsBlack() && AbsDot(wi, n) != 0.f) {
         // Compute ray differential _rd_ for specular reflection
         RayDifferential rd(p, wi, ray, isect.rayEpsilon);
         if (ray.hasDifferentials) {
@@ -189,7 +190,8 @@ Spectrum SpecularReflect(const RayDifferential &ray, BSDF *bsdf,
                                                      dDNdy * n);
         }
         PBRT_STARTED_SPECULAR_REFLECTION_RAY(const_cast<RayDifferential *>(&rd));
-        L = renderer->Li(scene, rd, sample, arena) * f * AbsDot(wi, n);
+        Spectrum Li = renderer->Li(scene, rd, sample, rng, arena);
+        L = f * Li * AbsDot(wi, n) / pdf;
         PBRT_FINISHED_SPECULAR_REFLECTION_RAY(const_cast<RayDifferential *>(&rd));
     }
     return L;
@@ -200,12 +202,13 @@ Spectrum SpecularTransmit(const RayDifferential &ray, BSDF *bsdf,
         RNG &rng, const Intersection &isect, const Renderer *renderer,
         const Scene *scene, const Sample *sample, MemoryArena &arena) {
     Vector wo = -ray.d, wi;
+    float pdf;
     const Point &p = bsdf->dgShading.p;
     const Normal &n = bsdf->dgShading.nn;
-    Spectrum f = bsdf->Sample_f(wo, &wi, rng,
-        BxDFType(BSDF_TRANSMISSION | BSDF_SPECULAR));
+    Spectrum f = bsdf->Sample_f(wo, &wi, BSDFSample(rng), &pdf,
+                               BxDFType(BSDF_TRANSMISSION | BSDF_SPECULAR));
     Spectrum L = 0.f;
-    if (!f.IsBlack() && AbsDot(wi, n) != 0.f) {
+    if (pdf > 0.f && !f.IsBlack() && AbsDot(wi, n) != 0.f) {
         // Compute ray differential _rd_ for specular transmission
         RayDifferential rd(p, wi, ray, isect.rayEpsilon);
         if (ray.hasDifferentials) {
@@ -232,7 +235,8 @@ Spectrum SpecularTransmit(const RayDifferential &ray, BSDF *bsdf,
             rd.ryDirection = wi + eta * dwody - Vector(mu * dndy + dmudy * n);
         }
         PBRT_STARTED_SPECULAR_REFRACTION_RAY(const_cast<RayDifferential *>(&rd));
-        L = renderer->Li(scene, rd, sample, arena) * f * AbsDot(wi, n);
+        Spectrum Li = renderer->Li(scene, rd, sample, rng, arena);
+        L = f * Li * AbsDot(wi, n) / pdf;
         PBRT_FINISHED_SPECULAR_REFRACTION_RAY(const_cast<RayDifferential *>(&rd));
     }
     return L;
@@ -240,10 +244,10 @@ Spectrum SpecularTransmit(const RayDifferential &ray, BSDF *bsdf,
 
 
 Distribution1D *ComputeLightSamplingCDF(const Scene *scene) {
-    u_int nLights = int(scene->lights.size());
+    uint32_t nLights = int(scene->lights.size());
     Assert(nLights > 0);
     vector<float>lightPower(nLights, 0.f);
-    for (u_int i = 0; i < nLights; ++i)
+    for (uint32_t i = 0; i < nLights; ++i)
         lightPower[i] = scene->lights[i]->Power(scene).y();
     return new Distribution1D(&lightPower[0], nLights);
 }

@@ -158,23 +158,14 @@ VolumeRegion::~VolumeRegion() {
 
 
 Spectrum VolumeRegion::sigma_t(const Point &p, const Vector &w,
-    float time) const {
+                               float time) const {
     return sigma_a(p, w, time) + sigma_s(p, w, time);
-}
-
-
-DensityRegion::DensityRegion(const Spectrum &sa,
-                             const Spectrum &ss, float gg,
-                             const Spectrum &emit,
-                             const Transform &VolumeToWorld)
-    : sig_a(sa), sig_s(ss), le(emit), g(gg)  {
-    WorldToVolume = Inverse(VolumeToWorld);
 }
 
 
 AggregateVolume::AggregateVolume(const vector<VolumeRegion *> &r) {
     regions = r;
-    for (u_int i = 0; i < regions.size(); ++i)
+    for (uint32_t i = 0; i < regions.size(); ++i)
         bound = Union(bound, regions[i]->WorldBound());
 }
 
@@ -182,7 +173,7 @@ AggregateVolume::AggregateVolume(const vector<VolumeRegion *> &r) {
 Spectrum AggregateVolume::sigma_a(const Point &p, const Vector &w,
                                   float time) const {
     Spectrum s(0.);
-    for (u_int i = 0; i < regions.size(); ++i)
+    for (uint32_t i = 0; i < regions.size(); ++i)
         s += regions[i]->sigma_a(p, w, time);
     return s;
 }
@@ -190,7 +181,7 @@ Spectrum AggregateVolume::sigma_a(const Point &p, const Vector &w,
 
 Spectrum AggregateVolume::sigma_s(const Point &p, const Vector &w, float time) const {
     Spectrum s(0.);
-    for (u_int i = 0; i < regions.size(); ++i)
+    for (uint32_t i = 0; i < regions.size(); ++i)
         s += regions[i]->sigma_s(p, w, time);
     return s;
 }
@@ -198,7 +189,7 @@ Spectrum AggregateVolume::sigma_s(const Point &p, const Vector &w, float time) c
 
 Spectrum AggregateVolume::Lve(const Point &p, const Vector &w, float time) const {
     Spectrum L(0.);
-    for (u_int i = 0; i < regions.size(); ++i)
+    for (uint32_t i = 0; i < regions.size(); ++i)
         L += regions[i]->Lve(p, w, time);
     return L;
 }
@@ -207,7 +198,7 @@ Spectrum AggregateVolume::Lve(const Point &p, const Vector &w, float time) const
 float AggregateVolume::p(const Point &p, const Vector &w, const Vector &wp,
         float time) const {
     float ph = 0, sumWt = 0;
-    for (u_int i = 0; i < regions.size(); ++i) {
+    for (uint32_t i = 0; i < regions.size(); ++i) {
         float sigt = regions[i]->sigma_t(p, w, time).y();
         if (sigt != 0.f) {
             float wt = regions[i]->sigma_s(p, w, time).y() / sigt;
@@ -221,7 +212,7 @@ float AggregateVolume::p(const Point &p, const Vector &w, const Vector &wp,
 
 Spectrum AggregateVolume::sigma_t(const Point &p, const Vector &w, float time) const {
     Spectrum s(0.);
-    for (u_int i = 0; i < regions.size(); ++i)
+    for (uint32_t i = 0; i < regions.size(); ++i)
         s += regions[i]->sigma_t(p, w, time);
     return s;
 }
@@ -229,7 +220,7 @@ Spectrum AggregateVolume::sigma_t(const Point &p, const Vector &w, float time) c
 
 Spectrum AggregateVolume::tau(const Ray &ray, float step, float offset) const {
     Spectrum t(0.);
-    for (u_int i = 0; i < regions.size(); ++i)
+    for (uint32_t i = 0; i < regions.size(); ++i)
         t += regions[i]->tau(ray, step, offset);
     return t;
 }
@@ -239,7 +230,7 @@ bool AggregateVolume::IntersectP(const Ray &ray,
                                  float *t0, float *t1) const {
     *t0 = INFINITY;
     *t1 = -INFINITY;
-    for (u_int i = 0; i < regions.size(); ++i) {
+    for (uint32_t i = 0; i < regions.size(); ++i) {
         float tr0, tr1;
         if (regions[i]->IntersectP(ray, &tr0, &tr1)) {
             *t0 = min(*t0, tr0);
@@ -251,7 +242,7 @@ bool AggregateVolume::IntersectP(const Ray &ray,
 
 
 AggregateVolume::~AggregateVolume() {
-    for (u_int i = 0; i < regions.size(); ++i)
+    for (uint32_t i = 0; i < regions.size(); ++i)
         delete regions[i];
 }
 
@@ -261,14 +252,12 @@ BBox AggregateVolume::WorldBound() const {
 }
 
 
-bool GetVolumeScatteringProperties(const string &name, float *sigma_a,
-        float *sigma_prime_s) {
-    for (u_int i = 0; i < sizeof(mss) / sizeof(mss[0]); ++i) {
+bool GetVolumeScatteringProperties(const string &name, Spectrum *sigma_a,
+        Spectrum *sigma_prime_s) {
+    for (uint32_t i = 0; i < sizeof(mss) / sizeof(mss[0]); ++i) {
         if (name == mss[i].name) {
-            for (int j = 0; j < 3; ++j) {
-                sigma_a[j] = mss[i].sigma_a[j];
-                sigma_prime_s[j] = mss[i].sigma_prime_s[j];
-            }
+            *sigma_a = Spectrum::FromRGB(mss[i].sigma_a);
+            *sigma_prime_s = Spectrum::FromRGB(mss[i].sigma_prime_s);
             return true;
         }
     }
@@ -285,7 +274,7 @@ void SubsurfaceFromDiffuse(const Spectrum &Kd, float meanPathLength,
     for (int i = 0; i < 3; ++i) {
        // Compute $\alpha'$ for RGB component, compute scattering properties
        float alphap = RdToAlphap(rgb[i], A);
-       float sigma_tr = 1.f / meanPathLength; // l_d
+       float sigma_tr = 1.f / meanPathLength;
        float sigma_prime_t = sigma_tr / sqrtf(3.f * 1.f - alphap);
        sigma_prime_s_rgb[i] = alphap * sigma_prime_t;
        sigma_a_rgb[i] = sigma_prime_t - sigma_prime_s_rgb[i];

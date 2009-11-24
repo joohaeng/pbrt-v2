@@ -52,13 +52,13 @@ AreaLight *CreateDiffuseAreaLight(const Transform &light2world, const ParamSet &
     Spectrum L = paramSet.FindOneSpectrum("L", Spectrum(1.0));
     Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
     int nSamples = paramSet.FindOneInt("nsamples", 1);
-    if (getenv("PBRT_QUICK_RENDER")) nSamples = max(1, nSamples / 4);
+    if (PbrtOptions.quickRender) nSamples = max(1, nSamples / 4);
     return new DiffuseAreaLight(light2world, L * sc, nSamples, shape);
 }
 
 
-Spectrum DiffuseAreaLight::Sample_L(const Point &p,
-        float pEpsilon, const LightSample &ls, float time, Vector *wi, float *pdf,
+Spectrum DiffuseAreaLight::Sample_L(const Point &p, float pEpsilon,
+        const LightSample &ls, float time, Vector *wi, float *pdf,
         VisibilityTester *visibility) const {
     Normal ns;
     Point ps = shapeSet->Sample(p, ls, &ns);
@@ -69,15 +69,14 @@ Spectrum DiffuseAreaLight::Sample_L(const Point &p,
 }
 
 
-float DiffuseAreaLight::Pdf(const Point &p,
-                     const Vector &wi) const {
+float DiffuseAreaLight::Pdf(const Point &p, const Vector &wi) const {
     return shapeSet->Pdf(p, wi);
 }
 
 
 Spectrum DiffuseAreaLight::Sample_L(const Scene *scene,
-        const LightSample &ls, float u1, float u2, float time, Ray *ray,
-        Normal *Ns, float *pdf) const {
+        const LightSample &ls, float u1, float u2, float time,
+        Ray *ray, Normal *Ns, float *pdf) const {
     Point org = shapeSet->Sample(ls, Ns);
     Vector dir = UniformSampleSphere(u1, u2);
     if (Dot(dir, *Ns) < 0.) dir *= -1.f;

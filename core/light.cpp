@@ -41,9 +41,9 @@ bool VisibilityTester::Unoccluded(const Scene *scene) const {
 
 Spectrum VisibilityTester::Transmittance(const Scene *scene,
         const Renderer *renderer, const Sample *sample,
-        RNG *rng, MemoryArena &arena) const {
+        RNG &rng, MemoryArena &arena) const {
     return renderer->Transmittance(scene, RayDifferential(r), sample,
-                                   arena, rng);
+                                   rng, arena);
 }
 
 
@@ -54,13 +54,13 @@ Spectrum Light::Le(const RayDifferential &) const {
 
 LightSampleOffsets::LightSampleOffsets(int count, Sample *sample) {
     nSamples = count;
-    posOffset = sample->Add2D(nSamples);
     componentOffset = sample->Add1D(nSamples);
+    posOffset = sample->Add2D(nSamples);
 }
 
 
 LightSample::LightSample(const Sample *sample,
-        const LightSampleOffsets &offsets, u_int num) {
+                         const LightSampleOffsets &offsets, uint32_t num) {
     Assert(num < sample->n2D[offsets.posOffset]);
     Assert(num < sample->n1D[offsets.componentOffset]);
     uPos[0] = sample->twoD[offsets.posOffset][2*num];
@@ -74,19 +74,18 @@ void Light::SHProject(const Point &p, float pEpsilon, int lmax,
         RNG &rng, Spectrum *coeffs) const {
     for (int i = 0; i < SHTerms(lmax); ++i)
         coeffs[i] = 0.f;
-    u_int ns = RoundUpPow2(nSamples);
-    u_int scramble1D = rng.RandomUInt();
-    u_int scramble2D[2] = { rng.RandomUInt(), rng.RandomUInt() };
+    uint32_t ns = RoundUpPow2(nSamples);
+    uint32_t scramble1D = rng.RandomUInt();
+    uint32_t scramble2D[2] = { rng.RandomUInt(), rng.RandomUInt() };
     float *Ylm = ALLOCA(float, SHTerms(lmax));
-    for (u_int i = 0; i < ns; ++i) {
+    for (uint32_t i = 0; i < ns; ++i) {
         // Compute incident radiance sample from _light_, update SH _coeffs_
         float u[2], pdf;
         Sample02(i, scramble2D, u);
         LightSample lightSample(u[0], u[1], VanDerCorput(i, scramble1D));
         Vector wi;
         VisibilityTester vis;
-        Spectrum Li = Sample_L(p, pEpsilon, lightSample, time,
-                               &wi, &pdf, &vis);
+        Spectrum Li = Sample_L(p, pEpsilon, lightSample, time, &wi, &pdf, &vis);
         if (!Li.IsBlack() && pdf > 0.f &&
             (!computeLightVisibility || vis.Unoccluded(scene))) {
             // Add light sample contribution to MC estimate of SH coefficients
@@ -117,7 +116,7 @@ ShapeSet::ShapeSet(const Reference<Shape> &s) {
 
     // Compute total area of shapes in _ShapeSet_ and area CDF
     sumArea = 0.f;
-    for (u_int i = 0; i < shapes.size(); ++i) {
+    for (uint32_t i = 0; i < shapes.size(); ++i) {
         float a = shapes[i]->Area();
         areas.push_back(a);
         sumArea += a;
@@ -132,7 +131,7 @@ ShapeSet::~ShapeSet() {
 
 
 Point ShapeSet::Sample(const Point &p, const LightSample &ls,
-        Normal *Ns) const {
+                       Normal *Ns) const {
     int sn = areaDistribution->SampleDiscrete(ls.uComponent, NULL);
     return shapes[sn]->Sample(p, ls.uPos[0], ls.uPos[1], Ns);
 }
@@ -146,7 +145,7 @@ Point ShapeSet::Sample(const LightSample &ls, Normal *Ns) const {
 
 float ShapeSet::Pdf(const Point &p, const Vector &wi) const {
     float pdf = 0.f;
-    for (u_int i = 0; i < shapes.size(); ++i)
+    for (uint32_t i = 0; i < shapes.size(); ++i)
         pdf += areas[i] * shapes[i]->Pdf(p, wi);
     return pdf / sumArea;
 }
@@ -154,7 +153,7 @@ float ShapeSet::Pdf(const Point &p, const Vector &wi) const {
 
 float ShapeSet::Pdf(const Point &p) const {
     float pdf = 0.f;
-    for (u_int i = 0; i < shapes.size(); ++i)
+    for (uint32_t i = 0; i < shapes.size(); ++i)
         pdf += areas[i] * shapes[i]->Pdf(p);
     return pdf / sumArea;
 }

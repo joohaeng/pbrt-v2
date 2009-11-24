@@ -33,10 +33,8 @@
 struct InfiniteAreaCube {
     // InfiniteAreaCube Public Methods
     InfiniteAreaCube(const InfiniteAreaLight *l, const Scene *s,
-                     float t, bool cv, float pe) {
-        light = l; scene = s; time = t;
-        computeVis = cv; pEpsilon = pe;
-    }
+                     float t, bool cv, float pe)
+        : light(l), scene(s), time(t), pEpsilon(pe), computeVis(cv) { }
     Spectrum operator()(int, int, const Point &p, const Vector &w) {
         Ray ray(p, w, pEpsilon, INFINITY, time);
         if (!computeVis || !scene->IntersectP(ray))
@@ -119,6 +117,7 @@ Spectrum InfiniteAreaLight::Le(const RayDifferential &r) const {
 void InfiniteAreaLight::SHProject(const Point &p, float pEpsilon,
         int lmax, const Scene *scene, bool computeLightVis,
         float time, RNG &rng, Spectrum *coeffs) const {
+    // Project _InfiniteAreaLight_ to SH using Monte Carlo if visibility needed
     if (computeLightVis) {
         Light::SHProject(p, pEpsilon, lmax, scene, computeLightVis,
                          time, rng, coeffs);
@@ -153,14 +152,12 @@ void InfiniteAreaLight::SHProject(const Point &p, float pEpsilon,
                                   sintheta[theta] * sinphi[phi],
                                   costheta[theta]);
                 w = Normalize(LightToWorld(w));
-                if (!computeLightVis || !scene->IntersectP(Ray(p, w, pEpsilon))) {
-                    Spectrum Le = Spectrum(radianceMap->Texel(0, phi, theta),
-                                           SPECTRUM_ILLUMINANT);
-                    SHEvaluate(w, lmax, Ylm);
-                    for (int i = 0; i < SHTerms(lmax); ++i)
-                        coeffs[i] += Le * Ylm[i] * sintheta[theta] *
-                            (M_PI / ntheta) * (2.f * M_PI / nphi);
-                }
+                Spectrum Le = Spectrum(radianceMap->Texel(0, phi, theta),
+                                       SPECTRUM_ILLUMINANT);
+                SHEvaluate(w, lmax, Ylm);
+                for (int i = 0; i < SHTerms(lmax); ++i)
+                    coeffs[i] += Le * Ylm[i] * sintheta[theta] *
+                        (M_PI / ntheta) * (2.f * M_PI / nphi);
             }
         }
 
@@ -182,7 +179,7 @@ InfiniteAreaLight *CreateInfiniteLight(const Transform &light2world,
     Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
     string texmap = paramSet.FindOneString("mapname", "");
     int nSamples = paramSet.FindOneInt("nsamples", 1);
-    if (getenv("PBRT_QUICK_RENDER")) nSamples = max(1, nSamples / 4);
+    if (PbrtOptions.quickRender) nSamples = max(1, nSamples / 4);
     return new InfiniteAreaLight(light2world, L * sc, nSamples, texmap);
 }
 
@@ -196,8 +193,8 @@ Spectrum InfiniteAreaLight::Sample_L(const Point &p, float pEpsilon,
 
     // Convert infinite light sample point to direction
     float theta = uv[1] * M_PI, phi = uv[0] * 2.f * M_PI;
-    float costheta = cos(theta), sintheta = sin(theta);
-    float sinphi = sin(phi), cosphi = cos(phi);
+    float costheta = cosf(theta), sintheta = sinf(theta);
+    float sinphi = sinf(phi), cosphi = cosf(phi);
     *wi = LightToWorld(Vector(sintheta * cosphi, sintheta * sinphi,
                               costheta));
 

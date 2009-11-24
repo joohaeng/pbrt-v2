@@ -56,13 +56,12 @@ Sampler *StratifiedSampler::GetSubSampler(int num, int count) {
 }
 
 
-int StratifiedSampler::GetMoreSamples(Sample *samples) {
+int StratifiedSampler::GetMoreSamples(Sample *samples, RNG &rng) {
     if (yPos == yPixelEnd) return 0;
     int nSamples = xPixelSamples * yPixelSamples;
     // Generate stratified camera samples for (_xPos_,_yPos_)
 
     // Generate initial stratified samples into _sampleBuf_ memory
-    RNG &rng = *samples[0].rng;
     float *bufp = sampleBuf;
     float *imageSamples = bufp; bufp += 2 * nSamples;
     float *lensSamples = bufp;  bufp += 2 * nSamples;
@@ -92,9 +91,9 @@ int StratifiedSampler::GetMoreSamples(Sample *samples) {
         samples[i].lensV = lensSamples[2*i+1];
         samples[i].time = Lerp(timeSamples[i], shutterOpen, shutterClose);
         // Generate stratified samples for integrators
-        for (u_int j = 0; j < samples[i].n1D.size(); ++j)
+        for (uint32_t j = 0; j < samples[i].n1D.size(); ++j)
             LatinHypercube(samples[i].oneD[j], samples[i].n1D[j], 1, rng);
-        for (u_int j = 0; j < samples[i].n2D.size(); ++j)
+        for (uint32_t j = 0; j < samples[i].n2D.size(); ++j)
             LatinHypercube(samples[i].twoD[j], samples[i].n2D[j], 2, rng);
     }
 
@@ -115,7 +114,7 @@ StratifiedSampler *CreateStratifiedSampler(const ParamSet &params, const Film *f
     film->GetSampleExtent(&xstart, &xend, &ystart, &yend);
     int xsamp = params.FindOneInt("xsamples", 2);
     int ysamp = params.FindOneInt("ysamples", 2);
-    if (getenv("PBRT_QUICK_RENDER")) xsamp = ysamp = 1;
+    if (PbrtOptions.quickRender) xsamp = ysamp = 1;
     return new StratifiedSampler(xstart, xend, ystart, yend, xsamp, ysamp,
         jitter, camera->shutterOpen, camera->shutterClose);
 }

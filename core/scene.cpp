@@ -36,13 +36,13 @@
 Scene::~Scene() {
     delete aggregate;
     delete volumeRegion;
-    for (u_int i = 0; i < lights.size(); ++i)
+    for (uint32_t i = 0; i < lights.size(); ++i)
         delete lights[i];
 }
 
 
 Scene::Scene(Primitive *accel, const vector<Light *> &lts,
-        VolumeRegion *vr) {
+             VolumeRegion *vr) {
     lights = lts;
     aggregate = accel;
     volumeRegion = vr;

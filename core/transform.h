@@ -68,8 +68,7 @@ struct Matrix4x4 {
         }
         fprintf(f, " ] ");
     }
-    static Matrix4x4
-    Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
+    static Matrix4x4 Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
         Matrix4x4 r;
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j)
@@ -114,8 +113,8 @@ public:
         return t.m != m || t.mInv != mInv;
     }
     bool operator<(const Transform &t2) const {
-        for (u_int i = 0; i < 4; ++i)
-            for (u_int j = 0; j < 4; ++j) {
+        for (uint32_t i = 0; i < 4; ++i)
+            for (uint32_t j = 0; j < 4; ++j) {
                 if (m.m[i][j] < t2.m.m[i][j]) return true;
                 if (m.m[i][j] > t2.m.m[i][j]) return false;
             }

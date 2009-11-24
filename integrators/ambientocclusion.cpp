@@ -32,14 +32,13 @@
 // AmbientOcclusionIntegrator Method Definitions
 Spectrum AmbientOcclusionIntegrator::Li(const Scene *scene, const Renderer *renderer,
         const RayDifferential &ray, const Intersection &isect,
-        const Sample *sample, MemoryArena &arena) const {
+        const Sample *sample, RNG &rng, MemoryArena &arena) const {
 
     BSDF *bsdf = isect.GetBSDF(ray, arena);
     const Point &p = bsdf->dgShading.p;
     Normal n = Faceforward(isect.dg.nn, -ray.d);
 
-    u_int scramble[2] = { sample->rng->RandomUInt(),
-                          sample->rng->RandomUInt() };
+    uint32_t scramble[2] = { rng.RandomUInt(), rng.RandomUInt() };
     float u[2];
     int nClear = 0;
     for (int i = 0; i < nSamples; ++i) {
@@ -56,7 +55,7 @@ Spectrum AmbientOcclusionIntegrator::Li(const Scene *scene, const Renderer *rend
 AmbientOcclusionIntegrator *CreateAmbientOcclusionIntegrator(const ParamSet &params) {
     int nSamples = params.FindOneInt("nsamples", 2048);
     float maxDist = params.FindOneFloat("maxdist", INFINITY);
-    if (getenv("PBRT_QUICK_RENDER")) { nSamples = max(1, nSamples / 4); }
+    if (PbrtOptions.quickRender) { nSamples = max(1, nSamples / 4); }
     return new AmbientOcclusionIntegrator(nSamples, maxDist);
 }
 

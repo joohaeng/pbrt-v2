@@ -33,33 +33,31 @@
 class CreateRadianceProbes : public Renderer {
 public:
     // CreateRadianceProbes Public Methods
-    CreateRadianceProbes(int lmax, float probeSpacing, const BBox &bbox,
-        int maxDepth, int nIndirSamples, bool includeDirect,
-        bool includeIndirect, float time, const Point &pCamera,
-        const string &filename);
+    CreateRadianceProbes(SurfaceIntegrator *surf, VolumeIntegrator *vol,
+        const Camera *camera, int lmax, float probeSpacing, const BBox &bbox,
+        int nIndirSamples, bool includeDirect, bool includeIndirect,
+        float time, const string &filename);
     ~CreateRadianceProbes();
     void Render(const Scene *scene);
     Spectrum Li(const Scene *scene, const RayDifferential &ray,
-        const Sample *sample, MemoryArena &arena, Intersection *isect,
+        const Sample *sample, RNG &rng, MemoryArena &arena, Intersection *isect,
         Spectrum *T) const;
     Spectrum Transmittance(const Scene *scene, const RayDifferential &ray,
-        const Sample *sample, MemoryArena &arena, RNG *rng) const;
+        const Sample *sample, RNG &rng, MemoryArena &arena) const;
 private:
     // CreateRadianceProbes Private Data
-    Point pCamera;
     SurfaceIntegrator *surfaceIntegrator;
     VolumeIntegrator *volumeIntegrator;
-    Sample *origSample;
-    int lmax, nProbes[3], nIndirSamples;
-    Spectrum **c_in;
+    const Camera *camera;
+    int lmax, nIndirSamples;
     BBox bbox;
-    float time, probeSpacing;
     bool includeDirectInProbes, includeIndirectInProbes;
+    float time, probeSpacing;
     string filename;
 };
 
 
-CreateRadianceProbes *CreateRadianceProbesRenderer(const Point &pCamera,
-    const ParamSet &params);
+CreateRadianceProbes *CreateRadianceProbesRenderer(const Camera *camera,
+    SurfaceIntegrator *surf, VolumeIntegrator *vol, const ParamSet &params);
 
 #endif // PBRT_RENDERERS_CREATEPROBES_H

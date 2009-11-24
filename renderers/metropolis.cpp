@@ -50,7 +50,7 @@ public:
     }
     Spectrum Li(const Scene *scene, const Renderer *renderer,
         const RayDifferential &ray, const Intersection &isect,
-        const Sample *sample, MemoryArena &arena) const;
+        const Sample *sample, RNG &rng, MemoryArena &arena) const;
     void RequestSamples(Sampler *sampler, Sample *sample, const Scene *scene);
 private:
     LightSampleOffsets *lightSampleOffsets;
@@ -250,7 +250,7 @@ MetropolisRenderer *CreateMetropolisRenderer(const ParamSet &params,
     int md = params.FindOneInt("maxdepth", 4);
     bool io = params.FindOneBool("indirectonly", false);
 
-    if (getenv("PBRT_QUICK_RENDER")) {
+    if (PbrtOptions.quickRender) {
         if (nSamples > 0)
             nSamples = max(1, nSamples / 4);
         if (perPixelSamples > 0)
@@ -288,7 +288,7 @@ void MetropolisRenderer::Render(const Scene *scene) {
         std::reverse(directTasks.begin(), directTasks.end());
         EnqueueTasks(directTasks);
         WaitForAllTasks();
-        for (u_int i = 0; i < directTasks.size(); ++i)
+        for (uint32_t i = 0; i < directTasks.size(); ++i)
             delete directTasks[i];
         delete sample;
         directProgress.Done();
@@ -337,7 +337,7 @@ void MetropolisRenderer::Render(const Scene *scene) {
                 &nSamplesFinished));
         EnqueueTasks(tasks);
         WaitForAllTasks();
-        for (u_int i = 0; i < tasks.size(); ++i)
+        for (uint32_t i = 0; i < tasks.size(); ++i)
             delete tasks[i];
         progress.Done();
     }
@@ -347,10 +347,10 @@ void MetropolisRenderer::Render(const Scene *scene) {
 
 void MLTDirectIntegrator::RequestSamples(Sampler *sampler, Sample *sample,
         const Scene *scene) {
-    u_int nLights = scene->lights.size();
+    uint32_t nLights = scene->lights.size();
     lightSampleOffsets = new LightSampleOffsets[nLights];
     bsdfSampleOffsets = new BSDFSampleOffsets[nLights];
-    for (u_int i = 0; i < nLights; ++i) {
+    for (uint32_t i = 0; i < nLights; ++i) {
         const Light *light = scene->lights[i];
         int nSamples = light->nSamples;
         if (sampler) nSamples = sampler->RoundSize(nSamples);
@@ -362,7 +362,7 @@ void MLTDirectIntegrator::RequestSamples(Sampler *sampler, Sample *sample,
 
 Spectrum MLTDirectIntegrator::Li(const Scene *scene,
         const Renderer *renderer, const RayDifferential &ray, const Intersection &isect,
-        const Sample *sample, MemoryArena &arena) const {
+        const Sample *sample, RNG &rng, MemoryArena &arena) const {
     Spectrum L(0.f);
     // Evaluate BSDF at hit point
     BSDF *bsdf = isect.GetBSDF(ray, arena);
@@ -372,8 +372,8 @@ Spectrum MLTDirectIntegrator::Li(const Scene *scene,
     // Compute emitted light if ray hit an area light source
     L += isect.Le(wo);
     L += UniformSampleAllLights(scene, renderer, arena, p, n, wo,
-            isect.rayEpsilon, bsdf,
-            sample, lightSampleOffsets, bsdfSampleOffsets);
+            isect.rayEpsilon, ray.time, bsdf, sample, rng, lightSampleOffsets,
+            bsdfSampleOffsets);
     return L;
 }
 
@@ -388,13 +388,13 @@ void MLTDirectTask::Run() {
     RNG rng(taskNum);
     // Allocate space for samples and intersections
     int maxSamples = sampler->MaximumSampleCount();
-    Sample *samples = origSample->Duplicate(maxSamples, &rng);
+    Sample *samples = origSample->Duplicate(maxSamples);
     RayDifferential *rays = new RayDifferential[maxSamples];
     Spectrum *Ls = new Spectrum[maxSamples];
     Spectrum *Ts = new Spectrum[maxSamples];
     Intersection *isects = new Intersection[maxSamples];
     int sampleCount;
-    while ((sampleCount = sampler->GetMoreSamples(samples)) > 0) {
+    while ((sampleCount = sampler->GetMoreSamples(samples, rng)) > 0) {
         for (int i = 0; i < sampleCount; ++i) {
             // Find camera ray for _sample[i]_
             PBRT_STARTED_GENERATING_CAMERA_RAY(&samples[i]);
@@ -404,9 +404,9 @@ void MLTDirectTask::Run() {
             if (rayWeight > 0.f) {
                 if (scene->Intersect(rays[i], &isects[i]))
                     Ls[i] = rayWeight * direct->Li(scene, renderer,
-                        rays[i], isects[i], &samples[i], arena);
+                        rays[i], isects[i], &samples[i], rng, arena);
                 else {
-                    for (u_int j = 0; j < scene->lights.size(); ++j)
+                    for (uint32_t j = 0; j < scene->lights.size(); ++j)
                         Ls[i] += rayWeight * scene->lights[j]->Le(rays[i]);
                 }
             }
@@ -430,9 +430,10 @@ void MLTDirectTask::Run() {
             PBRT_FINISHED_CAMERA_RAY_INTEGRATION(&rays[i], &samples[i], &Ls[i]);
         }
         // Report sample results to _Sampler_, add contributions to image
-        if (sampler->ReportResults(samples, rays, Ls,
-            isects, sampleCount)) {
-            for (int i = 0; i < sampleCount; ++i) {
+        if (sampler->ReportResults(samples, rays, Ls, isects, sampleCount))
+        {
+            for (int i = 0; i < sampleCount; ++i)
+            {
                 PBRT_STARTED_ADDING_IMAGE_SAMPLE(&samples[i], &rays[i], &Ls[i], &Ts[i]);
                 camera->film->AddSample(samples[i], Ls[i]);
                 PBRT_FINISHED_ADDING_IMAGE_SAMPLE();
@@ -490,7 +491,7 @@ void MLTTask::Run() {
     MemoryArena arena;
     vector<MLTSample> mltSamples(2, MLTSample(maxDepth));
     Spectrum sampleLs[2];
-    u_int currentSample = 0, proposedSample = 1;
+    uint32_t currentSample = 0, proposedSample = 1;
     mltSamples[currentSample] = initialSample;
     sampleLs[currentSample] = L(scene, renderer, camera, arena, rng, maxDepth, ignoreDirect,
         mltSamples[currentSample]);
@@ -562,7 +563,7 @@ static Spectrum L(const Scene *scene, const Renderer *renderer,
             bool includeLe = (specularBounce && pathLength >= 1) ||
                              (!ignoreDirect && pathLength == 0);
             if (includeLe)
-                for (u_int i = 0; i < scene->lights.size(); ++i)
+                for (uint32_t i = 0; i < scene->lights.size(); ++i)
                    L += pathThroughput * scene->lights[i]->Le(ray);
             break;
         }
@@ -577,12 +578,12 @@ static Spectrum L(const Scene *scene, const Renderer *renderer,
         if (!ignoreDirect || pathLength > 0) {
             LightSample lightSample(ps.lightDir0, ps.lightDir1, ps.lightNum0);
             BSDFSample bsdfSample(ps.bsdfLightDir0, ps.bsdfLightDir1, ps.bsdfLightComponent);
-            u_int lightNum = Floor2Int(ps.lightNum1 * scene->lights.size());
-            lightNum = min(lightNum, (u_int)(scene->lights.size()-1));
+            uint32_t lightNum = Floor2Int(ps.lightNum1 * scene->lights.size());
+            lightNum = min(lightNum, (uint32_t)(scene->lights.size()-1));
             const Light *light = scene->lights[lightNum];
             L += pathThroughput *
                  EstimateDirect(scene, renderer, arena, light, p, n, wo,
-                     isect.rayEpsilon, sample.cameraSample.time, bsdf, &rng,
+                     isect.rayEpsilon, sample.cameraSample.time, bsdf, rng,
                      lightSample, bsdfSample);
         }
 
@@ -600,14 +601,14 @@ static Spectrum L(const Scene *scene, const Renderer *renderer,
         pathThroughput *= f * AbsDot(wi, n) / pdf;
         ray = RayDifferential(p, wi, ray, isect.rayEpsilon);
         
-        //pathThroughput *= renderer->Transmittance(scene, ray, NULL, arena, sample->rng);
+        //pathThroughput *= renderer->Transmittance(scene, ray, NULL, rng, arena);
     }
     return L;
 }
 
 
 Spectrum MetropolisRenderer::Li(const Scene *scene, const RayDifferential &ray,
-    const Sample *sample, MemoryArena &arena, Intersection *isect,
+    const Sample *sample, RNG &rng, MemoryArena &arena, Intersection *isect,
     Spectrum *T) const {
 Severe("WHA MLT::Li()");
 return 0.f;
@@ -615,7 +616,7 @@ return 0.f;
 
 
 Spectrum MetropolisRenderer::Transmittance(const Scene *scene, const RayDifferential &ray,
-    const Sample *sample, MemoryArena &arena, RNG *rng) const {
+    const Sample *sample, RNG &rng, MemoryArena &arena) const {
 // FIXME
     return 1.f;
 }

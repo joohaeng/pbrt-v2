@@ -34,11 +34,11 @@ Sampler *BestCandidateSampler::GetSubSampler(int num, int count) {
     ComputeSubWindow(num, count, &x0, &x1, &y0, &y1);
     if (x0 == x1 || y0 == y1) return NULL;
     return new BestCandidateSampler(x0, x1, y0, y1, samplesPerPixel,
-        shutterOpen, shutterClose, 1024*num);
+        shutterOpen, shutterClose);
 }
 
 
-int BestCandidateSampler::GetMoreSamples(Sample *sample) {
+int BestCandidateSampler::GetMoreSamples(Sample *sample, RNG &rng) {
 again:
     if (tableOffset == SAMPLE_TABLE_SIZE) {
         // Advance to next best-candidate sample table position
@@ -50,15 +50,16 @@ again:
         }
 
         // Update sample shifts
+        RNG tileRng(xTile + (yTile<<8));
         for (int i = 0; i < 3; ++i)
-            sampleOffsets[i] = sample->rng->RandomFloat();
+            sampleOffsets[i] = tileRng.RandomFloat();
     }
     // Compute raster sample from table
 #define WRAP(x) ((x) > 1 ? ((x)-1) : (x))
     sample->imageX = (xTile + sampleTable[tableOffset][0]) * tableWidth;
     sample->imageY = (yTile + sampleTable[tableOffset][1]) * tableWidth;
     sample->time  = Lerp(WRAP(sampleOffsets[0] +
-                         sampleTable[tableOffset][2]), shutterOpen, shutterClose);
+                              sampleTable[tableOffset][2]), shutterOpen, shutterClose);
     sample->lensU = WRAP(sampleOffsets[1] +
                          sampleTable[tableOffset][3]);
     sample->lensV = WRAP(sampleOffsets[2] +
@@ -72,9 +73,9 @@ again:
     }
 
     // Compute integrator samples for best-candidate sample
-    for (u_int i = 0; i < sample->n1D.size(); ++i)
+    for (uint32_t i = 0; i < sample->n1D.size(); ++i)
          LDShuffleScrambled1D(sample->n1D[i], 1, sample->oneD[i], rng);
-    for (u_int i = 0; i < sample->n2D.size(); ++i)
+    for (uint32_t i = 0; i < sample->n2D.size(); ++i)
          LDShuffleScrambled2D(sample->n2D[i], 1, sample->twoD[i], rng);
     ++tableOffset;
     return 1;
@@ -87,9 +88,9 @@ BestCandidateSampler *CreateBestCandidateSampler(const ParamSet &params, const F
     int xstart, xend, ystart, yend;
     film->GetSampleExtent(&xstart, &xend, &ystart, &yend);
     int nsamp = params.FindOneInt("pixelsamples", 4);
-    if (getenv("PBRT_QUICK_RENDER")) nsamp = 1;
+    if (PbrtOptions.quickRender) nsamp = 1;
     return new BestCandidateSampler(xstart, xend, ystart, yend, nsamp,
-         camera->shutterOpen, camera->shutterClose, 0);
+         camera->shutterOpen, camera->shutterClose);
 }
 
 

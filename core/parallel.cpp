@@ -54,7 +54,7 @@ static std::vector<Task *> taskQueue;
 #endif // PBRT_USE_GRAND_CENTRAL_DISPATCH
 #ifndef PBRT_USE_GRAND_CENTRAL_DISPATCH
 static Semaphore workerSemaphore;
-static u_int numUnfinishedTasks;
+static uint32_t numUnfinishedTasks;
 static ConditionVariable tasksRunningCondition;
 #endif // PBRT_USE_GRAND_CENTRAL_DISPATCH
 #ifndef PBRT_USE_GRAND_CENTRAL_DISPATCH
@@ -710,10 +710,6 @@ void ConditionVariable::Signal() {
 
 
 #endif // WIN32
-Task::~Task() {
-}
-
-
 void TasksInit() {
 #ifdef PBRT_USE_GRAND_CENTRAL_DISPATCH
     return;
@@ -771,6 +767,10 @@ void TasksCleanup() {
 }
 
 
+Task::~Task() {
+}
+
+
 #ifdef PBRT_USE_GRAND_CENTRAL_DISPATCH
 static void lRunTask(void *t) {
     Task *task = (Task *)t;
@@ -782,14 +782,14 @@ static void lRunTask(void *t) {
 
 #endif
 void EnqueueTasks(const vector<Task *> &tasks) {
+    if (PbrtOptions.nCores == 1) {
+        for (unsigned int i = 0; i < tasks.size(); ++i)
+            tasks[i]->Run();
+        return;
+    }
 #ifdef PBRT_USE_GRAND_CENTRAL_DISPATCH
-    static bool oneThread = (getenv("PBRT_NTHREADS") &&
-                               atoi(getenv("PBRT_NTHREADS")) == 1);
-    for (u_int i = 0; i < tasks.size(); ++i)
-        if (oneThread)
-            dispatch_sync_f(gcdQueue, tasks[i], lRunTask);
-        else
-            dispatch_group_async_f(gcdGroup, gcdQueue, tasks[i], lRunTask);
+    for (uint32_t i = 0; i < tasks.size(); ++i)
+        dispatch_group_async_f(gcdGroup, gcdQueue, tasks[i], lRunTask);
 #else
     if (!threads)
         TasksInit();
@@ -856,8 +856,7 @@ void WaitForAllTasks() {
 
 
 int NumSystemCores() {
-    if (getenv("PBRT_NTHREADS") && atoi(getenv("PBRT_NTHREADS")) > 0)
-        return atoi(getenv("PBRT_NTHREADS"));
+    if (PbrtOptions.nCores > 0) return PbrtOptions.nCores;
 #ifdef WIN32
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);

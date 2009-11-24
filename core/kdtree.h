@@ -30,7 +30,7 @@
 
 // KdTree Declarations
 struct KdNode {
-    void init(float p, u_int a) {
+    void init(float p, uint32_t a) {
         splitPos = p;
         splitAxis = a;
         rightChild = (1<<29)-1;
@@ -43,9 +43,9 @@ struct KdNode {
     }
     // KdNode Data
     float splitPos;
-    u_int splitAxis:2;
-    u_int hasLeftChild:1;
-    u_int rightChild:29;
+    uint32_t splitAxis:2;
+    uint32_t hasLeftChild:1;
+    uint32_t rightChild:29;
 };
 
 
@@ -61,15 +61,15 @@ public:
             LookupProc &process, float &maxDistSquared) const;
 private:
     // KdTree Private Methods
-    void recursiveBuild(u_int nodeNum, int start, int end,
+    void recursiveBuild(uint32_t nodeNum, int start, int end,
         const NodeData **buildNodes);
-    template <typename LookupProc> void privateLookup(u_int nodeNum,
+    template <typename LookupProc> void privateLookup(uint32_t nodeNum,
         const Point &p, LookupProc &process, float &maxDistSquared) const;
 
     // KdTree Private Data
     KdNode *nodes;
     NodeData *nodeData;
-    u_int nNodes, nextFreeNode;
+    uint32_t nNodes, nextFreeNode;
 };
 
 
@@ -91,18 +91,17 @@ KdTree<NodeData>::KdTree(const vector<NodeData> &d) {
     nextFreeNode = 1;
     nodes = AllocAligned<KdNode>(nNodes);
     nodeData = new NodeData[nNodes];
-    const NodeData **buildNodes = new const NodeData *[nNodes];
-    for (u_int i = 0; i < nNodes; ++i)
+    vector<const NodeData *> buildNodes(nNodes, NULL);
+    for (uint32_t i = 0; i < nNodes; ++i)
         buildNodes[i] = &d[i];
     // Begin the KdTree building process
-    recursiveBuild(0, 0, nNodes, buildNodes);
-    delete[] buildNodes;
+    recursiveBuild(0, 0, nNodes, &buildNodes[0]);
 }
 
 
 template <typename NodeData> void
-KdTree<NodeData>::recursiveBuild(u_int nodeNum,
-        int start, int end, const NodeData **buildNodes) {
+KdTree<NodeData>::recursiveBuild(uint32_t nodeNum, int start, int end,
+        const NodeData **buildNodes) {
     // Create leaf node of kd-tree if we've reached the bottom
     if (start + 1 == end) {
         nodes[nodeNum].initLeaf();
@@ -126,7 +125,7 @@ KdTree<NodeData>::recursiveBuild(u_int nodeNum,
     nodeData[nodeNum] = *buildNodes[splitPos];
     if (start < splitPos) {
         nodes[nodeNum].hasLeftChild = 1;
-        u_int childNum = nextFreeNode++;
+        uint32_t childNum = nextFreeNode++;
         recursiveBuild(childNum, start, splitPos, buildNodes);
     }
     if (splitPos+1 < end) {
@@ -138,15 +137,15 @@ KdTree<NodeData>::recursiveBuild(u_int nodeNum,
 
 
 template <typename NodeData> template <typename LookupProc>
-void KdTree<NodeData>::Lookup(const Point &p,
-        LookupProc &proc, float &maxDistSquared) const {
+void KdTree<NodeData>::Lookup(const Point &p, LookupProc &proc,
+        float &maxDistSquared) const {
     privateLookup(0, p, proc, maxDistSquared);
 }
 
 
 template <typename NodeData> template <typename LookupProc>
-void KdTree<NodeData>::privateLookup(u_int nodeNum,
-        const Point &p, LookupProc &process, float &maxDistSquared) const {
+void KdTree<NodeData>::privateLookup(uint32_t nodeNum, const Point &p,
+        LookupProc &process, float &maxDistSquared) const {
     KdNode *node = &nodes[nodeNum];
     // Process kd-tree node's children
     int axis = node->splitAxis;
