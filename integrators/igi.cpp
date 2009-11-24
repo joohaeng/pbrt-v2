@@ -105,11 +105,7 @@ void IGIIntegrator::Preprocess(const Scene *scene,
                 BSDF *bsdf = isect.GetBSDF(ray, arena);
 
                 // Create virtual light at ray intersection point
-                const int sqrtRhoSamples = 6;
-                float rhoSamples[2*sqrtRhoSamples*sqrtRhoSamples];
-                StratifiedSample2D(rhoSamples, sqrtRhoSamples, sqrtRhoSamples, rng);
-                Spectrum contrib = alpha * bsdf->rho(wo,
-                    sqrtRhoSamples*sqrtRhoSamples, rhoSamples) / M_PI;
+                Spectrum contrib = alpha * bsdf->rho(wo, rng) / M_PI;
                 virtualLights[s].push_back(VirtualLight(isect.dg.p, isect.dg.nn, contrib,
                     isect.rayEpsilon));
 
@@ -210,10 +206,8 @@ Spectrum IGIIntegrator::Li(const Scene *scene, const Renderer *renderer,
     if (ray.depth + 1 < maxSpecularDepth) {
         Vector wi;
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, bsdf, rng, isect, renderer,
-                             scene, sample, arena);
-        L += SpecularTransmit(ray, bsdf, rng, isect, renderer,
-                              scene, sample, arena);
+        L += SpecularReflect(ray, bsdf, rng, isect, renderer, scene, sample, arena);
+        L += SpecularTransmit(ray, bsdf, rng, isect, renderer, scene, sample, arena);
     }
     return L;
 }
@@ -221,7 +215,7 @@ Spectrum IGIIntegrator::Li(const Scene *scene, const Renderer *renderer,
 
 IGIIntegrator *CreateIGISurfaceIntegrator(const ParamSet &params) {
     int nLightPaths = params.FindOneInt("nlights", 64);
-    if (getenv("PBRT_QUICK_RENDER")) nLightPaths = max(1, nLightPaths / 4);
+    if (PbrtOptions.quickRender) nLightPaths = max(1, nLightPaths / 4);
     int nLightSets = params.FindOneInt("nsets", 4);
     float minDist = params.FindOneFloat("mindist", .1f);
     float rrThresh = params.FindOneFloat("rrthreshold", .0001f);
