@@ -203,10 +203,8 @@ Spectrum IrradianceCacheIntegrator::Li(const Scene *scene,
     if (ray.depth + 1 < maxSpecularDepth) {
         Vector wi;
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, bsdf, rng, isect, renderer,
-                             scene, sample, arena);
-        L += SpecularTransmit(ray, bsdf, rng, isect, renderer,
-                              scene, sample, arena);
+        L += SpecularReflect(ray, bsdf, rng, isect, renderer, scene, sample, arena);
+        L += SpecularTransmit(ray, bsdf, rng, isect, renderer, scene, sample, arena);
     }
 
     // Estimate indirect lighting with irradiance cache
@@ -378,7 +376,7 @@ IrradianceCacheIntegrator *CreateIrradianceCacheIntegrator(const ParamSet &param
     int maxSpecularDepth = params.FindOneInt("maxspeculardepth", 5);
     int maxIndirectDepth = params.FindOneInt("maxindirectdepth", 3);
     int nSamples = params.FindOneInt("nsamples", 4096);
-    if (getenv("PBRT_QUICK_RENDER")) nSamples = max(1, nSamples / 16);
+    if (PbrtOptions.quickRender) nSamples = max(1, nSamples / 16);
     return new IrradianceCacheIntegrator(minWeight, minSpacing, maxSpacing, maxAngle,
         maxSpecularDepth, maxIndirectDepth, nSamples);
 }

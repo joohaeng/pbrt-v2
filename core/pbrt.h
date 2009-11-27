@@ -86,6 +86,16 @@ class RWMutex;
 class Shape;
 class ParamSet;
 template <typename T> struct ParamSetItem;
+struct Options {
+    Options() { nCores = 0; quickRender = quiet = openWindow = false; }
+    int nCores;
+    bool quickRender;
+    bool quiet;
+    bool openWindow;
+};
+
+
+extern Options PbrtOptions;
 class TextureParams;
 class Scene;
 class Renderer;
@@ -141,6 +151,8 @@ class VolumeIntegrator;
 #define M_PI       3.14159265358979323846f
 #define INV_PI     0.31830988618379067154f
 #define INV_TWOPI  0.15915494309189533577f
+#define INV_FOURPI 0.07957747154594766788f
+
 #ifndef INFINITY
 #define INFINITY FLT_MAX
 #endif
