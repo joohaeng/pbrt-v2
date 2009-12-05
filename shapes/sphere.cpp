@@ -76,21 +76,23 @@ bool Sphere::Intersect(const Ray &r, float *tHit, float *rayEpsilon,
 
     // Compute sphere hit position and $\phi$
     phit = ray(thit);
-    if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5 * radius;
+    if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5f * radius;
     phi = atan2f(phit.y, phit.x);
     if (phi < 0.) phi += 2.f*M_PI;
 
     // Test sphere intersection against clipping parameters
-    if (phit.z < zmin || phit.z > zmax || phi > phiMax) {
+    if ((zmin > -radius && phit.z < zmin) ||
+        (zmax <  radius && phit.z > zmax) || phi > phiMax) {
         if (thit == t1) return false;
         if (t1 > ray.maxt) return false;
         thit = t1;
         // Compute sphere hit position and $\phi$
         phit = ray(thit);
-        if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5 * radius;
+        if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5f * radius;
         phi = atan2f(phit.y, phit.x);
         if (phi < 0.) phi += 2.f*M_PI;
-        if (phit.z < zmin || phit.z > zmax || phi > phiMax)
+        if ((zmin > -radius && phit.z < zmin) ||
+            (zmax <  radius && phit.z > zmax) || phi > phiMax)
             return false;
     }
 
@@ -175,21 +177,23 @@ bool Sphere::IntersectP(const Ray &r) const {
 
     // Compute sphere hit position and $\phi$
     phit = ray(thit);
-    if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5 * radius;
+    if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5f * radius;
     phi = atan2f(phit.y, phit.x);
     if (phi < 0.) phi += 2.f*M_PI;
 
     // Test sphere intersection against clipping parameters
-    if (phit.z < zmin || phit.z > zmax || phi > phiMax) {
+    if ((zmin > -radius && phit.z < zmin) ||
+        (zmax <  radius && phit.z > zmax) || phi > phiMax) {
         if (thit == t1) return false;
         if (t1 > ray.maxt) return false;
         thit = t1;
         // Compute sphere hit position and $\phi$
         phit = ray(thit);
-        if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5 * radius;
+        if (phit.x == 0.f && phit.y == 0.f) phit.x = 1e-5f * radius;
         phi = atan2f(phit.y, phit.x);
         if (phi < 0.) phi += 2.f*M_PI;
-        if (phit.z < zmin || phit.z > zmax || phi > phiMax)
+        if ((zmin > -radius && phit.z < zmin) ||
+            (zmax <  radius && phit.z > zmax) || phi > phiMax)
             return false;
     }
     return true;
@@ -240,9 +244,8 @@ Point Sphere::Sample(const Point &p, float u1, float u2,
     Point ps;
     Ray r(p, UniformSampleCone(u1, u2, cosThetaMax, wcX, wcY, wc), 1e-3f);
     if (!Intersect(r, &thit, &rayEpsilon, &dgSphere))
-        ps = Pcenter - radius * wc;
-    else
-        ps = r(thit);
+        thit = Dot(Pcenter - p, Normalize(r.d));
+    ps = r(thit);
     *ns = Normal(Normalize(ps - Pcenter));
     if (ReverseOrientation) *ns *= -1.f;
     return ps;
