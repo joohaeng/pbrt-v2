@@ -117,19 +117,17 @@ private:
 struct PhotonProcess {
     // PhotonProcess Public Methods
     PhotonProcess(uint32_t mp, ClosePhoton *buf);
-    void operator()(const Point &p, const Photon &photon, float dist2, float &maxDistSquared);
+    void operator()(const Point &p, const Photon &photon, float dist2,
+                    float &maxDistSquared);
     ClosePhoton *photons;
-    uint32_t nLookup;
-    uint32_t nFound;
+    uint32_t nLookup, nFound;
 };
 
 
 struct ClosePhoton {
     // ClosePhoton Public Methods
-    ClosePhoton(const Photon *p = NULL, float md2 = INFINITY) {
-        photon = p;
-        distanceSquared = md2;
-    }
+    ClosePhoton(const Photon *p = NULL, float md2 = INFINITY)
+        : photon(p), distanceSquared(md2) { }
     bool operator<(const ClosePhoton &p2) const {
         return distanceSquared == p2.distanceSquared ?
             (photon < p2.photon) : (distanceSquared < p2.distanceSquared);
@@ -153,7 +151,7 @@ struct RadiancePhotonProcess {
         photon = NULL;
     }
     void operator()(const Point &p, const RadiancePhoton &rp,
-            float distSquared, float &maxDistSquared) {
+                    float distSquared, float &maxDistSquared) {
         if (Dot(rp.n, n) > 0) {
             photon = &rp;
             maxDistSquared = distSquared;
@@ -166,10 +164,10 @@ struct RadiancePhotonProcess {
 
 inline float kernel(const Photon *photon, const Point &p, float maxDist2);
 static Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
-    MemoryArena &arena, BSDF *bsdf, RNG &rng, const Intersection &isect,
+    ClosePhoton *lookupBuf, BSDF *bsdf, RNG &rng, const Intersection &isect,
     const Vector &w, float maxDistSquared);
 static Spectrum EPhoton(KdTree<Photon> *map, int count, int nLookup,
-    ClosePhoton *lookupBuf, float maxDistSquared, const Point &p, const Normal &n);
+    ClosePhoton *lookupBuf, float maxDist2, const Point &p, const Normal &n);
 
 // PhotonIntegrator Local Definitions
 inline bool unsuccessful(uint32_t needed, uint32_t found, uint32_t shot) {
@@ -177,24 +175,44 @@ inline bool unsuccessful(uint32_t needed, uint32_t found, uint32_t shot) {
 }
 
 
+inline void PhotonProcess::operator()(const Point &p,
+        const Photon &photon, float distSquared, float &maxDistSquared) {
+    if (nFound < nLookup) {
+        // Add photon to unordered array of photons
+        photons[nFound++] = ClosePhoton(&photon, distSquared);
+        if (nFound == nLookup) {
+            std::make_heap(&photons[0], &photons[nLookup]);
+            maxDistSquared = photons[0].distanceSquared;
+        }
+    }
+    else {
+        // Remove most distant photon from heap and add new photon
+        std::pop_heap(&photons[0], &photons[nLookup]);
+        photons[nLookup-1] = ClosePhoton(&photon, distSquared);
+        std::push_heap(&photons[0], &photons[nLookup]);
+        maxDistSquared = photons[0].distanceSquared;
+    }
+}
+
+
 inline float kernel(const Photon *photon, const Point &p,
-        float maxDist2) {
+                    float maxDist2) {
     float s = (1.f - DistanceSquared(photon->p, p) / maxDist2);
     return 3.f * INV_PI * s * s;
 }
 
 
 Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
-      MemoryArena &arena, BSDF *bsdf, RNG &rng, const Intersection &isect,
-      const Vector &wo, float maxDistSquared) {
+      ClosePhoton *lookupBuf, BSDF *bsdf, RNG &rng,
+      const Intersection &isect, const Vector &wo, float maxDist2) {
     Spectrum L(0.);
     BxDFType nonSpecular = BxDFType(BSDF_REFLECTION |
         BSDF_TRANSMISSION | BSDF_DIFFUSE | BSDF_GLOSSY);
     if (map && bsdf->NumComponents(nonSpecular) > 0) {
         PBRT_PHOTON_MAP_STARTED_LOOKUP(const_cast<DifferentialGeometry *>(&isect.dg));
         // Do photon map lookup at intersection point
-        PhotonProcess proc(nLookup, arena.Alloc<ClosePhoton>(nLookup));
-        map->Lookup(isect.dg.p, proc, maxDistSquared);
+        PhotonProcess proc(nLookup, lookupBuf);
+        map->Lookup(isect.dg.p, proc, maxDist2);
 
         // Estimate reflected radiance due to incident photons
         ClosePhoton *photons = proc.photons;
@@ -205,8 +223,8 @@ Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
             // Compute exitant radiance from photons for glossy surface
             for (int i = 0; i < nFound; ++i) {
                 const Photon *p = photons[i].photon;
-                float k = kernel(p, isect.dg.p, maxDistSquared);
-                L += (k / (nPaths * maxDistSquared)) * bsdf->f(wo, p->wi) *
+                float k = kernel(p, isect.dg.p, maxDist2);
+                L += (k / (nPaths * maxDist2)) * bsdf->f(wo, p->wi) *
                      p->alpha;
             }
         }
@@ -215,14 +233,12 @@ Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
             Spectrum Lr(0.), Lt(0.);
             for (int i = 0; i < nFound; ++i) {
                 if (Dot(Nf, photons[i].photon->wi) > 0.f) {
-                    float k = kernel(photons[i].photon, isect.dg.p,
-                        maxDistSquared);
-                    Lr += (k / (nPaths * maxDistSquared)) * photons[i].photon->alpha;
+                    float k = kernel(photons[i].photon, isect.dg.p, maxDist2);
+                    Lr += (k / (nPaths * maxDist2)) * photons[i].photon->alpha;
                 }
                 else {
-                    float k = kernel(photons[i].photon, isect.dg.p,
-                        maxDistSquared);
-                    Lt += (k / (nPaths * maxDistSquared)) * photons[i].photon->alpha;
+                    float k = kernel(photons[i].photon, isect.dg.p, maxDist2);
+                    Lt += (k / (nPaths * maxDist2)) * photons[i].photon->alpha;
                 }
             }
             L += Lr * bsdf->rho(wo, rng, BSDF_ALL_REFLECTION) * INV_PI +
@@ -236,12 +252,12 @@ Spectrum LPhoton(KdTree<Photon> *map, int nPaths, int nLookup,
 
 
 Spectrum EPhoton(KdTree<Photon> *map, int count, int nLookup,
-        ClosePhoton *lookupBuf, float maxDistSquared, const Point &p,
+        ClosePhoton *lookupBuf, float maxDist2, const Point &p,
         const Normal &n) {
     if (!map) return 0.f;
     // Lookup nearby photons at irradiance computation point
     PhotonProcess proc(nLookup, lookupBuf);
-    float md2 = maxDistSquared;
+    float md2 = maxDist2;
     map->Lookup(p, proc, md2);
     Assert(md2 > 0.f);
 
@@ -355,7 +371,7 @@ void PhotonIntegrator::Preprocess(const Scene *scene,
         indirectMap = new KdTree<Photon>(indirectPhotons);
 
     // Precompute radiance at a subset of the photons
-    if (finalGather) {
+    if (finalGather && radiancePhotons.size()) {
         // Launch tasks to compute photon radiances
         vector<Task *> radianceTasks;
         uint32_t numTasks = 64;
@@ -371,9 +387,8 @@ void PhotonIntegrator::Preprocess(const Scene *scene,
         for (uint32_t i = 0; i < radianceTasks.size(); ++i)
             delete radianceTasks[i];
         progRadiance.Done();
-    }
-    if (radiancePhotons.size())
         radianceMap = new KdTree<RadiancePhoton>(radiancePhotons);
+    }
     delete directMap;
 }
 
@@ -414,7 +429,7 @@ void PhotonShootingTask::Run() {
                 PBRT_PHOTON_MAP_STARTED_RAY_PATH(&photonRay, &alpha);
                 bool specularPath = true;
                 Intersection photonIsect;
-                uint32_t nIntersections = 0;
+                int nIntersections = 0;
                 while (scene->Intersect(photonRay, &photonIsect)) {
                     ++nIntersections;
                     // Handle photon/surface intersection
@@ -429,19 +444,24 @@ void PhotonShootingTask::Run() {
                         // Deposit photon at surface
                         Photon photon(photonIsect.dg.p, alpha, wo);
                         bool depositedPhoton = false;
-                        if (nIntersections == 1 && !indirectDone) {
-                            PBRT_PHOTON_MAP_DEPOSITED_DIRECT_PHOTON(&photonIsect.dg, &alpha, &wo);
-                            depositedPhoton = true;
-                            localDirectPhotons.push_back(photon);
-                        }
-                        else {
-                            // Deposit either caustic or indirect photon
-                            if (specularPath && !causticDone) {
+                        if (specularPath && nIntersections > 1) {
+                            if (!causticDone) {
                                 PBRT_PHOTON_MAP_DEPOSITED_CAUSTIC_PHOTON(&photonIsect.dg, &alpha, &wo);
                                 depositedPhoton = true;
                                 localCausticPhotons.push_back(photon);
                             }
-                            else if (!specularPath && !indirectDone) {
+                        }
+                        else {
+                            // Deposit either direct or indirect photon
+                            // stop depositing direct photons once indirectDone is true; don't
+                            // want to waste memory storing too many if we're going a long time
+                            // trying to get enough caustic photons desposited.
+                            if (nIntersections == 1 && !indirectDone && integrator->finalGather) {
+                                PBRT_PHOTON_MAP_DEPOSITED_DIRECT_PHOTON(&photonIsect.dg, &alpha, &wo);
+                                depositedPhoton = true;
+                                localDirectPhotons.push_back(photon);
+                            }
+                            else if (nIntersections > 1 && !indirectDone) {
                                 PBRT_PHOTON_MAP_DEPOSITED_INDIRECT_PHOTON(&photonIsect.dg, &alpha, &wo);
                                 depositedPhoton = true;
                                 localIndirectPhotons.push_back(photon);
@@ -450,16 +470,17 @@ void PhotonShootingTask::Run() {
 
                         // Possibly create radiance photon at photon intersection point
                         if (depositedPhoton && integrator->finalGather &&
-                            rng.RandomFloat() < .125f) {
-                            // Store data for radiance photon
+                                rng.RandomFloat() < .125f) {
                             Normal n = photonIsect.dg.nn;
                             n = Faceforward(n, -photonRay.d);
                             localRadiancePhotons.push_back(RadiancePhoton(photonIsect.dg.p, n));
-                            localRpReflectances.push_back(photonBSDF->rho(rng, BSDF_ALL_REFLECTION));
-                            localRpTransmittances.push_back(photonBSDF->rho(rng, BSDF_ALL_TRANSMISSION));
+                            Spectrum rho_r = photonBSDF->rho(rng, BSDF_ALL_REFLECTION);
+                            localRpReflectances.push_back(rho_r);
+                            Spectrum rho_t = photonBSDF->rho(rng, BSDF_ALL_TRANSMISSION);
+                            localRpTransmittances.push_back(rho_t);
                         }
                     }
-                    if ((int)nIntersections >= integrator->maxPhotonDepth) break;
+                    if (nIntersections >= integrator->maxPhotonDepth) break;
 
                     // Sample new photon ray direction
                     Vector wi;
@@ -505,13 +526,6 @@ void PhotonShootingTask::Run() {
         progress.Update(localIndirectPhotons.size() + localCausticPhotons.size());
         nshot += blockSize;
 
-        // Merge direct photons into shared array
-        nDirectPaths += blockSize;
-        for (uint32_t i = 0; i < localDirectPhotons.size(); ++i)
-            directPhotons.push_back(localDirectPhotons[i]);
-        localDirectPhotons.erase(localDirectPhotons.begin(),
-                                 localDirectPhotons.end());
-
         // Merge indirect photons into shared array
         if (!indirectDone) {
             integrator->nIndirectPaths += blockSize;
@@ -523,7 +537,13 @@ void PhotonShootingTask::Run() {
                 indirectDone = true;
         }
 
-        // Merge caustic photons into shared array
+        // Merge direct, caustic, and radiance photons into shared array
+        nDirectPaths += blockSize;
+        for (uint32_t i = 0; i < localDirectPhotons.size(); ++i)
+            directPhotons.push_back(localDirectPhotons[i]);
+        localDirectPhotons.erase(localDirectPhotons.begin(),
+                                 localDirectPhotons.end());
+        
         if (!causticDone) {
             integrator->nCausticPaths += blockSize;
             for (uint32_t i = 0; i < localCausticPhotons.size(); ++i)
@@ -532,8 +552,7 @@ void PhotonShootingTask::Run() {
             if (causticPhotons.size() >= integrator->nCausticPhotonsWanted)
                 causticDone = true;
         }
-
-        // Merge radiance photons and reflectances into shared array
+        
         for (uint32_t i = 0; i < localRadiancePhotons.size(); ++i)
             radiancePhotons.push_back(localRadiancePhotons[i]);
         localRadiancePhotons.erase(localRadiancePhotons.begin(), localRadiancePhotons.end());
@@ -557,7 +576,7 @@ void ComputeRadianceTask::Run() {
     uint32_t taskSize = radiancePhotons.size() / numTasks;
     uint32_t excess = radiancePhotons.size() % numTasks;
     uint32_t rpStart = min(taskNum, excess) * (taskSize+1) +
-                    max(0, (int)taskNum-(int)excess) * taskSize;
+                       max(0, (int)taskNum-(int)excess) * taskSize;
     uint32_t rpEnd = rpStart + taskSize + (taskNum < excess ? 1 : 0);
     if (taskNum == numTasks-1) Assert(rpEnd == radiancePhotons.size());
     ClosePhoton *lookupBuf = new ClosePhoton[nLookup];
@@ -607,11 +626,12 @@ Spectrum PhotonIntegrator::Li(const Scene *scene, const Renderer *renderer,
         wo, isect.rayEpsilon, ray.time, bsdf, sample, rng,
         lightSampleOffsets, bsdfSampleOffsets);
     // Compute caustic lighting for photon map integrator
-    L += LPhoton(causticMap, nCausticPaths, nLookup, arena, bsdf,
+    ClosePhoton *lookupBuf = arena.Alloc<ClosePhoton>(nLookup);
+    L += LPhoton(causticMap, nCausticPaths, nLookup, lookupBuf, bsdf,
                  rng, isect, wo, maxDistSquared);
 
     // Compute indirect lighting for photon map integrator
-    if (finalGather) {
+    if (finalGather && indirectMap != NULL) {
     #if 1
         // Do one-bounce final gather for photon map
         BxDFType nonSpecular = BxDFType(BSDF_REFLECTION |
@@ -736,7 +756,7 @@ Spectrum PhotonIntegrator::Li(const Scene *scene, const Renderer *renderer,
     #endif
     }
     else
-        L += LPhoton(indirectMap, nIndirectPaths, nLookup, arena,
+        L += LPhoton(indirectMap, nIndirectPaths, nLookup, lookupBuf,
                      bsdf, rng, isect, wo, maxDistSquared);
     if (ray.depth+1 < maxSpecularDepth) {
         Vector wi;
@@ -745,26 +765,6 @@ Spectrum PhotonIntegrator::Li(const Scene *scene, const Renderer *renderer,
         L += SpecularTransmit(ray, bsdf, rng, isect, renderer, scene, sample, arena);
     }
     return L;
-}
-
-
-void PhotonProcess::operator()(const Point &p, const Photon &photon,
-        float distSquared, float &maxDistSquared) {
-    if (nFound < nLookup) {
-        // Add photon to unordered array of photons
-        photons[nFound++] = ClosePhoton(&photon, distSquared);
-        if (nFound == nLookup) {
-            std::make_heap(&photons[0], &photons[nLookup]);
-            maxDistSquared = photons[0].distanceSquared;
-        }
-    }
-    else {
-        // Remove most distant photon from heap and add new photon
-        std::pop_heap(&photons[0], &photons[nLookup]);
-        photons[nLookup-1] = ClosePhoton(&photon, distSquared);
-        std::push_heap(&photons[0], &photons[nLookup]);
-        maxDistSquared = photons[0].distanceSquared;
-    }
 }
 
 

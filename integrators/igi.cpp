@@ -39,8 +39,8 @@ IGIIntegrator::~IGIIntegrator() {
 }
 
 
-void IGIIntegrator::RequestSamples(Sampler *sampler,
-        Sample *sample, const Scene *scene) {
+void IGIIntegrator::RequestSamples(Sampler *sampler, Sample *sample,
+                                   const Scene *scene) {
     // Allocate and request samples for sampling all lights
     uint32_t nLights = scene->lights.size();
     lightSampleOffsets = new LightSampleOffsets[nLights];
@@ -58,8 +58,8 @@ void IGIIntegrator::RequestSamples(Sampler *sampler,
 }
 
 
-void IGIIntegrator::Preprocess(const Scene *scene,
-        const Camera *camera, const Renderer *renderer) {
+void IGIIntegrator::Preprocess(const Scene *scene, const Camera *camera,
+                               const Renderer *renderer) {
     if (scene->lights.size() == 0) return;
     MemoryArena arena;
     RNG rng;
@@ -82,7 +82,8 @@ void IGIIntegrator::Preprocess(const Scene *scene,
 
             // Choose light source to trace virtual light path from
             float lightPdf;
-            int ln = lightDistribution->SampleDiscrete(lightNum[sampOffset], &lightPdf);
+            int ln = lightDistribution->SampleDiscrete(lightNum[sampOffset],
+                                                       &lightPdf);
             Light *light = scene->lights[ln];
 
             // Sample ray leaving light source for virtual light path
@@ -107,7 +108,7 @@ void IGIIntegrator::Preprocess(const Scene *scene,
                 // Create virtual light at ray intersection point
                 Spectrum contrib = alpha * bsdf->rho(wo, rng) / M_PI;
                 virtualLights[s].push_back(VirtualLight(isect.dg.p, isect.dg.nn, contrib,
-                    isect.rayEpsilon));
+                                                        isect.rayEpsilon));
 
                 // Sample new ray direction and update weight for virtual light path
                 Vector wi;
@@ -149,21 +150,20 @@ Spectrum IGIIntegrator::Li(const Scene *scene, const Renderer *renderer,
                     lightSampleOffsets, bsdfSampleOffsets);
     // Compute indirect illumination with virtual lights
     uint32_t lSet = min(uint32_t(sample->oneD[vlSetOffset][0] * nLightSets),
-                     nLightSets-1);
+                        nLightSets-1);
     for (uint32_t i = 0; i < virtualLights[lSet].size(); ++i) {
         const VirtualLight &vl = virtualLights[lSet][i];
         // Compute virtual light's tentative contribution _Llight_
         float d2 = DistanceSquared(p, vl.p);
         Vector wi = Normalize(vl.p - p);
         float G = AbsDot(wi, n) * AbsDot(wi, vl.n) / d2;
-        Spectrum f = bsdf->f(wo, wi);
         G = min(G, gLimit);
+        Spectrum f = bsdf->f(wo, wi);
         if (G == 0.f || f.IsBlack()) continue;
         Spectrum Llight = f * G * vl.pathContrib / virtualLights[lSet].size();
         RayDifferential connectRay(p, wi, ray, isect.rayEpsilon,
-            sqrtf(d2) * (1.f - vl.rayEpsilon));
-        Llight *= renderer->Transmittance(scene, connectRay, NULL, rng,
-                                          arena);
+                                   sqrtf(d2) * (1.f - vl.rayEpsilon));
+        Llight *= renderer->Transmittance(scene, connectRay, NULL, rng, arena);
 
         // Possibly skip virtual light shadow ray with Russian roulette
         if (Llight.y() < rrThreshold) {
@@ -184,8 +184,7 @@ Spectrum IGIIntegrator::Li(const Scene *scene, const Renderer *renderer,
             Vector wi;
             float pdf;
             BSDFSample bsdfSample = (ray.depth == 0) ?
-                                    BSDFSample(sample, gatherSampleOffset, i) :
-                                    BSDFSample(rng);
+                BSDFSample(sample, gatherSampleOffset, i) : BSDFSample(rng);
             Spectrum f = bsdf->Sample_f(wo, &wi, bsdfSample,
                                         &pdf, BxDFType(BSDF_ALL & ~BSDF_SPECULAR));
             if (!f.IsBlack() && pdf > 0.f) {
@@ -193,13 +192,16 @@ Spectrum IGIIntegrator::Li(const Scene *scene, const Renderer *renderer,
                 float maxDist = sqrtf(AbsDot(wi, n) / gLimit);
                 RayDifferential gatherRay(p, wi, ray, isect.rayEpsilon, maxDist);
                 Intersection gatherIsect;
-                Spectrum Li = renderer->Li(scene, gatherRay, sample, rng, arena, &gatherIsect);
+                Spectrum Li = renderer->Li(scene, gatherRay, sample, rng, arena,
+                                           &gatherIsect);
                 if (Li.IsBlack()) continue;
                 float Ggather = AbsDot(wi, n) * AbsDot(-wi, gatherIsect.dg.nn) /
                     DistanceSquared(p, gatherIsect.dg.p);
-                if (Ggather - gLimit > 0.f && !isinf(Ggather))
-                    L += f * Li * ((Ggather - gLimit) / Ggather * AbsDot(wi, n) /
-                        (nSamples * pdf));
+                if (Ggather - gLimit > 0.f && !isinf(Ggather)) {
+                    float gs  = (Ggather - gLimit) / Ggather *
+                                AbsDot(-wi, gatherIsect.dg.nn);
+                    L += f * Li * (AbsDot(wi, n) * gs / (nSamples * pdf));
+                }
             }
         }
     }
@@ -217,12 +219,11 @@ IGIIntegrator *CreateIGISurfaceIntegrator(const ParamSet &params) {
     int nLightPaths = params.FindOneInt("nlights", 64);
     if (PbrtOptions.quickRender) nLightPaths = max(1, nLightPaths / 4);
     int nLightSets = params.FindOneInt("nsets", 4);
-    float minDist = params.FindOneFloat("mindist", .1f);
     float rrThresh = params.FindOneFloat("rrthreshold", .0001f);
     int maxDepth = params.FindOneInt("maxdepth", 5);
     float glimit = params.FindOneFloat("glimit", 10.f);
     int gatherSamples = params.FindOneInt("gathersamples", 16);
-    return new IGIIntegrator(nLightPaths, nLightSets, minDist, rrThresh,
+    return new IGIIntegrator(nLightPaths, nLightSets, rrThresh,
                              maxDepth, glimit, gatherSamples);
 }
 
