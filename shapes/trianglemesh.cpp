@@ -177,12 +177,14 @@ bool Triangle::Intersect(const Ray &ray, float *tHit, float *rayEpsilon,
     float tv = b0*uvs[0][1] + b1*uvs[1][1] + b2*uvs[2][1];
 
     // Test intersection against alpha texture, if present
+    if (ray.depth != -1) {
     if (mesh->alphaTexture) {
         DifferentialGeometry dgLocal(ray(t), dpdu, dpdv,
                                      Normal(0,0,0), Normal(0,0,0),
                                      tu, tv, this);
         if (mesh->alphaTexture->Evaluate(dgLocal) == 0.f)
             return false;
+    }
     }
 
     // Fill in _DifferentialGeometry_ from triangle hit
@@ -230,7 +232,7 @@ bool Triangle::IntersectP(const Ray &ray) const {
         return false;
 
     // Test shadow ray intersection against alpha texture, if present
-    if (mesh->alphaTexture) {
+    if (ray.depth != -1 && mesh->alphaTexture) {
         // Compute triangle partial derivatives
         Vector dpdu, dpdv;
         float uvs[3][2];
@@ -314,8 +316,13 @@ void Triangle::GetShadingGeometry(const Transform &obj2world,
                                           b[1] * mesh->s[v[1]] +
                                           b[2] * mesh->s[v[2]]));
     else   ss = Normalize(dg.dpdu);
-    ts = Normalize(Cross(ss, ns));
-    ss = Cross(ts, ns);
+    ts = Cross(ss, ns);
+    if (ts.LengthSquared() > 0.f) {
+        ts = Normalize(ts);
+        ss = Cross(ts, ns);
+    }
+    else
+        CoordinateSystem((Vector)ns, &ss, &ts);
     Normal dndu, dndv;
 
     // Compute $\dndu$ and $\dndv$ for triangle shading geometry
