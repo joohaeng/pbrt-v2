@@ -38,8 +38,9 @@ public:
                 float thickness_,
                 const Reference<Texture<Spectrum> > &a,
                 const Reference<Texture<float> > &tir_,
-                const Reference<Texture<float> > &mf_normal_,
-                const Reference<Texture<float> > &base_only_
+                bool mf_normal_,
+                bool base_only_,
+                int sampling_method_
 	) 
 	{
         m1 = mat1;
@@ -50,6 +51,7 @@ public:
         tir = tir_;
         mf_normal = mf_normal_;
         base_only = base_only_;
+        sampling_method = sampling_method_;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,
@@ -57,12 +59,15 @@ public:
 private:
     // LayeredMaterial Private Data
     Reference<Material> m1, m2;
+    int sampling_method;
     //Reference<Texture<float> > 	ior;
     float ior;
     float thickness;
     Reference<Texture<float> > 	tir; // 1 for TIR computation, otherwise for no consideration.
-    Reference<Texture<float> > 	mf_normal; // 0 to select a surface normal rather than a MF normal
-    Reference<Texture<float> > 	base_only; // 0 to select a surface normal rather than a MF normal
+    //Reference<Texture<float> > 	mf_normal;
+    bool mf_normal; // "false" to select a surface normal rather than a MF normal
+    //Reference<Texture<float> > 	base_only;
+    bool base_only; // "true" to neglect the effect of coating layer
     Reference<Texture<Spectrum> > absorption;
 };
 

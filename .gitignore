@@ -2,6 +2,7 @@
 */.DS_Store
 *.swp
 core/pbrtparse.cpp
+core/pbrtlex.cpp
 bin/
 bin/pbrt
 objs/*.o
