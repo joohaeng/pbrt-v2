@@ -184,11 +184,9 @@ inline Spectrum CosThetaSpectrum(const Vector &v, const Vector &u, float mult = 
 Spectrum LayeredBxDF::f_A2L(
 	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
 
-#if 1
 	Spectrum spectrum_1 = Spectrum(1.f);
 	Vector whr;
 	Spectrum t = f21->Evaluate(Dot(wor, wh));
-	//Spectrum t = f21->Evaluate(CosTheta(wor));
 
 	//
 	// Geometric Attenuation
@@ -208,67 +206,29 @@ Spectrum LayeredBxDF::f_A2L(
 	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
 
 	Spectrum f_b = bxdf_base->f(wor, wir);
-#endif
 
-	//return t;
-	//return Spectrum(g);
-	//return Spectrum(0);
-	//return spectrum_1;
-    //return a;
-    //return f_b;
-    //return f12->Evaluate(Dot(wi, wh));
-    //return Spectrum(Dot(wi, wh));
-	//return Vec2Spectrum(wi);
-	//return Vec2Abs2Spectrum(wor);
-	//return Vec2Len2Spectrum(wir);
-	//return CosThetaSpectrum(wi, Vector(0,0,1), 1);
-	//return CosThetaSpectrum(wi, wh, 1);
     return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
 }
 
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 
-	//
-	// exitant ray
-	//
-	Vector wh, wor, wir; // wor, wir: refracted dir of wi and wo inside a coating layer
+	Vector wh, wor, wir;
 	Spectrum f_b;
-#if 1
-	//Spectrum t;
-	//Transform R;
-	if (precomputed && 0) {
-		/*
-		wh = smp_wh;
-		wor = smp_wor;
-		wir = smp_wir;
-		f_b = smp_f_b;
-		*/
-	} else {
-		wh = (mf_normal ? Normalize(Normalize(wi) + Normalize(wo)) : Vector(0,0,1));
-		//
-		// Note: the below generates error in smp_0 + mfnormal_true
-		//
-		//wh = (mf_normal ? Normalize(wi + wo) : Vector(0,0,1));
+	wh = (mf_normal ? Normalize(Normalize(wi) + Normalize(wo)) : Vector(0,0,1));
+	//
+	// Note: the below generates error in smp_0 + mfnormal_true
+	//
+	//wh = (mf_normal ? Normalize(wi + wo) : Vector(0,0,1));
 
-		if (mf_normal) {
-		//if (mf_normal && wh.z < 0.999999 ) {
-			//R = SnellTransform(wh);
-			//wor = SnellDir(wo, etai, etat, R);
-			//wir = SnellDir(wi, etai, etat, R);
-			wor = SnellDir(wo, etai, etat, wh);
-			wir = SnellDir(wi, etai, etat, wh);
-		}
-		else {
-			wor = SnellDir(wo, etai, etat);
-			wir = SnellDir(wi, etai, etat);
-		}
+	if (mf_normal) {
+		wor = SnellDir(wo, etai, etat, wh);
+		wir = SnellDir(wi, etai, etat, wh);
 	}
-#endif	
+	else {
+		wor = SnellDir(wo, etai, etat);
+		wir = SnellDir(wi, etai, etat);
+	}
 
-	//return Spectrum(1.0f);
-	//return Vec2Spectrum(wir);
-	//return CosThetaSpectrum(wi, Vector(0,0,1), 1);
-	//return CosThetaSpectrum(wh, Vector(0,0,1), 1);
 	return f_A2L(wi, wh, wir, wor);
 
 }
@@ -297,9 +257,6 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
 		smp_f_b = bxdf_base->Sample_f(smp_wor, &smp_wir, u1, u2, pdf);
 		*wi = smp_wi = SnellDir(smp_wir, etat, etai);
 
-		//smp_wh = (mf_normal ? Normalize(smp_wi + wo) : Vector(0,0,1));
-		//*wi = smp_wh;
-
 		return f_A2L(*wi, Vector(0,0,1), smp_wir, smp_wor);
 		//return f_A2L(*wi, Normalize(wo+*wi), smp_wir, smp_wor);
 		break;
@@ -323,43 +280,21 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
 		wi:		Snell's law
 		pdf:	base
 		*/
-		//precomputed = true;
 		smp_f_c = bxdf_coating->Sample_f(wo, &smp_wi, u1, u2, &smp_pdf_c);
-		//Transform R;
-		//smp_wh = (mf_normal ? Normalize(Normalize(smp_wi) + Normalize(wo)) : Vector(0,0,1));
 		smp_wh = (mf_normal ? Normalize(smp_wi + wo) : Vector(0,0,1));
-		//smp_wh = Normalize((Normalize(smp_wi) + Normalize(wo))/2.f);
-		//smp_wh = Vector(1,0,0);
-		//smp_wh = smp_wi;
-		//smp_wh = Normalize(smp_wi - wo);
-		//if (mf_normal && smp_wh.z < 0.999999 ) {
 		if (mf_normal) { 
-			//R = SnellTransform(smp_wh);
-			//smp_wor = SnellDir(wo, etai, etat, R);
 			smp_wor = SnellDir(wo, etai, etat, smp_wh);
 		}
 		else {
 			smp_wor = SnellDir(wo, etai, etat);
 		}
 		smp_f_b = bxdf_base->Sample_f(smp_wor, &smp_wir, u1, u2, &smp_pdf_b);
-		//if (mf_normal && smp_wh.z < 0.999999 ) {
 		if (mf_normal) {
-			//*wi = SnellDir(smp_wir, etat, etai, R);
 			*wi = SnellDir(smp_wir, etat, etai, smp_wh);
 		}
 		else {
 			*wi = SnellDir(smp_wir, etat, etai);
 		}
-
-		//
-		// even the smp_wi may contain noises. See (smp_wi-wo)
-		//
-		//*wi = Vector(0,0,1);
-		//*wi = wo;
-		//*wi = smp_wi;
-		//*wi = smp_wh;
-		//*wi = smp_wor;
-		//*wi = smp_wir;
 
 		//
 		// PDF does not solve the artifacts
@@ -372,20 +307,7 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
     	//*pdf = SameHemisphere(wo, wi) ? AbsCosTheta(wi) * INV_PI : 0.f;
     	//*pdf = AbsCosTheta(smp_wi) * INV_PI; // does not help
 	
-		//Spectrum r;
-		//r.FromRGB(wo[0],wo[1],wo[2]);
-		//float rgb[3] = {
-		//	wo[0] - smp_wor[0],
-		//	wo[1] - smp_wor[1],
-		//	wo[2] - smp_wor[2]
-		//};
-		//return r;
-		//return Spectrum(1.f);
-		//float rgb[3] = {wo[0],wo[1],wo[2]};
-		//return Spectrum::FromRGB(rgb);
-		//return Spectrum(0.f);
 		return f_A2L(*wi, smp_wh, smp_wir, smp_wor);
-		//break;
 	}
 #define SMP_0 1
 #ifdef SMP_0
