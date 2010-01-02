@@ -181,29 +181,45 @@ inline Spectrum CosThetaSpectrum(const Vector &v, const Vector &u, float mult = 
 	return Spectrum(Dot(v,u)*mult);
 }
 
-Spectrum LayeredBxDF::f_A2L(
+Spectrum LayeredBxDF::f_cfg_1(
+	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
+	return f_cfg(wi, wh, wir, wor);
+}
+
+Spectrum LayeredBxDF::f_cfg_2(
+	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
+	return f_cfg(wi, wh, wir, wor);
+}
+	
+Spectrum LayeredBxDF::f_cfg(
 	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
 
 	Spectrum spectrum_1 = Spectrum(1.f);
-	Vector whr;
 	Spectrum t = f21->Evaluate(Dot(wor, wh));
 
 	//
 	// Geometric Attenuation
 	//
-	whr = Normalize(wir + wor);
-	float g = G(wor, wir, whr);
+	//Vector whr = Normalize(wir + wor);
+	//float g = G(wor, wir, whr);
 
 	//
 	// TIR
 	//
-	t = spectrum_1 - ( tir ? t * g : t);
+	//t = spectrum_1 - ( tir ? t * G(wor, wir, Normalize(wir + wor)) : t);
+	if (tir)
+		t = spectrum_1 - t * G(wor, wir, Normalize(wir + wor));
+	else
+		t = spectrum_1 - t;
 
 	//
 	// Absorbtion
 	//
-	float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
-	Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
+	//float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
+	//Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
+	Spectrum a = spectrum_1;
+	if (depth > 0) 
+		a = Exp(-alpha * depth * (1/CosTheta(wir) + 1/CosTheta(wor)));
 
 	Spectrum f_b = bxdf_base->f(wor, wir);
 
@@ -229,7 +245,7 @@ Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 		wir = SnellDir(wi, etai, etat);
 	}
 
-	return f_A2L(wi, wh, wir, wor);
+	return f_cfg(wi, wh, wir, wor);
 
 }
 
@@ -257,9 +273,12 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
 		smp_f_b = bxdf_base->Sample_f(smp_wor, &smp_wir, u1, u2, pdf);
 		*wi = smp_wi = SnellDir(smp_wir, etat, etai);
 
-		return f_A2L(*wi, Vector(0,0,1), smp_wir, smp_wor);
-		//return f_A2L(*wi, Normalize(wo+*wi), smp_wir, smp_wor);
-		break;
+		//return f_cfg(*wi, Normalize(wo+*wi), smp_wir, smp_wor);
+		//
+		// Below may result in difference for many metropolis samples.
+		//
+		return f_cfg(*wi, Vector(0,0,1), smp_wir, smp_wor);
+
 	case 1:
 		/*
 		wo: 	given
@@ -307,7 +326,7 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
     	//*pdf = SameHemisphere(wo, wi) ? AbsCosTheta(wi) * INV_PI : 0.f;
     	//*pdf = AbsCosTheta(smp_wi) * INV_PI; // does not help
 	
-		return f_A2L(*wi, smp_wh, smp_wir, smp_wor);
+		return f_cfg(*wi, smp_wh, smp_wir, smp_wor);
 	}
 #define SMP_0 1
 #ifdef SMP_0

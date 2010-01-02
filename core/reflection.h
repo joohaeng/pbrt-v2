@@ -261,11 +261,15 @@ public:
 class LayeredBxDF : public BxDF {
 public:
     // LayeredBxDF Public Methods
-    LayeredBxDF(BxDF *b_coating, BxDF *b_base, Fresnel *fresnel_12, Fresnel *fresnel_21, const Spectrum &absorption, float thickness, float eta_i, float eta_t, bool doTIR, bool doMFNormal, int sampling_method_)
+    LayeredBxDF(BxDF *b_coating, BxDF *b_base, Fresnel *fresnel_12, Fresnel *fresnel_21, 
+			const Spectrum &absorption, float thickness, float eta_i, float eta_t, 
+			bool doTIR, bool doMFNormal, 
+			int sampling_method_, int configuration_, int nbundles_)
         : BxDF(BxDFType(b_base->type)), bxdf_coating(b_coating), bxdf_base(b_base),
 			f12(fresnel_12), f21(fresnel_21), alpha(absorption), depth(thickness),
 			etai(eta_i), etat(eta_t), tir(doTIR), mf_normal(doMFNormal), 
-			sampling_method(sampling_method_)
+			sampling_method(sampling_method_), configuration(configuration_), 
+			nbundles(nbundles_)
 	{
     }
     Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
@@ -275,7 +279,9 @@ public:
         const float *samples2) const {
         return bxdf_base->rho(nSamples, samples1, samples2);
     }
-	Spectrum f_A2L(const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor
+	Spectrum f_cfg(const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
+	Spectrum f_cfg_1(const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
+	Spectrum f_cfg_2(const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor
 ) const;
 
     Spectrum f(const Vector &wo, const Vector &wi) const;
@@ -292,7 +298,8 @@ private:
 	bool tir;
 	bool mf_normal;
 	int sampling_method; // integer values; each method is coded in sample_f()
-	bool precomputed;
+	int configuration;
+	int nbundles;
 };
 
 class FresnelConductor : public Fresnel {

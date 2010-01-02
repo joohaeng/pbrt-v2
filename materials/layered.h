@@ -40,7 +40,9 @@ public:
                 const Reference<Texture<float> > &tir_,
                 bool mf_normal_,
                 bool base_only_,
-                int sampling_method_
+                int sampling_method_,
+                int configuration_,
+                int nsamples_
 	) 
 	{
         m1 = mat1;
@@ -52,6 +54,8 @@ public:
         mf_normal = mf_normal_;
         base_only = base_only_;
         sampling_method = sampling_method_;
+        configuration = configuration_;
+        nbundles = nbundles;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,
@@ -59,6 +63,8 @@ public:
 private:
     // LayeredMaterial Private Data
     Reference<Material> m1, m2;
+    int configuration;
+    int nbundles;
     int sampling_method;
     //Reference<Texture<float> > 	ior;
     float ior;
