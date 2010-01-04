@@ -279,9 +279,9 @@ public:
         const float *samples2) const {
         return bxdf_base->rho(nSamples, samples1, samples2);
     }
-	Spectrum f_cfg(const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
-	Spectrum f_cfg_1(const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
-	Spectrum f_cfg_2(const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor
+	Spectrum f_cfg(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
+	Spectrum f_cfg_1(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
+	Spectrum f_cfg_2(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor
 ) const;
 
     Spectrum f(const Vector &wo, const Vector &wi) const;

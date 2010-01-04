@@ -42,7 +42,7 @@ public:
                 bool base_only_,
                 int sampling_method_,
                 int configuration_,
-                int nsamples_
+                int nbundles_
 	) 
 	{
         m1 = mat1;
@@ -55,7 +55,7 @@ public:
         base_only = base_only_;
         sampling_method = sampling_method_;
         configuration = configuration_;
-        nbundles = nbundles;
+        nbundles = nbundles_;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,

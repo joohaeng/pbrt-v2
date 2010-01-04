@@ -107,24 +107,17 @@ inline Transform SnellTransform (const Vector &h) {
 }
 inline Vector SnellDir(const Vector &wi, float etai, float etat, const Vector &wh){
 	float cosi = Dot(wi,wh);
-    float sini2 = 1 - cosi*cosi;
+    float sini2 = 1.f - cosi*cosi;
     float eta = etai / etat;
-    float sint2 = eta * eta * sini2;
-
-	//float cost = sqrt(1-max(1.0f,sint2));
-	//float angle = acosf(Clamp(cost, -1.f, 1.f))/M_PI*180.f;
+    float sint2 = min( 1.f, eta * eta * sini2);
 
 	float angle = asinf( Clamp( sqrt( sint2), 0.f, 1.f))/M_PI*180.f;
 
 	Vector axis = Cross(wh, wi);
 	Transform r = Rotate(angle, axis);
 	Vector wr = r(wh);
-	Assert(wr.z > 0);
 
 	return wr;
-	//return Vector(0,0,1);
-	//return axis;
-	//return h;
 
 }
 inline Vector SnellDir(const Vector &w, float etai, float etat) {
@@ -181,17 +174,90 @@ inline Spectrum CosThetaSpectrum(const Vector &v, const Vector &u, float mult = 
 	return Spectrum(Dot(v,u)*mult);
 }
 
-Spectrum LayeredBxDF::f_cfg_1(
+Spectrum LayeredBxDF::f_cfg( const Vector &wo,
 	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
-	return f_cfg(wi, wh, wir, wor);
+	switch (configuration) {
+	case 2:
+		return f_cfg_2(wo, wi, wh, wir, wor);
+	default:
+		return f_cfg_1(wo, wi, wh, wir, wor);
+	}
 }
 
-Spectrum LayeredBxDF::f_cfg_2(
-	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
-	return f_cfg(wi, wh, wir, wor);
+bool inline bounded(const Vector &v, const Vector &v_min, const Vector &v_max) {
+	if ( Normalize(v).z >= v_max.z ) return true;
+	else if ( Dot(v_min, v) >= 0.f) return true;
+	else return false;
+}
+
+Spectrum LayeredBxDF::f_cfg_2( const Vector &wo,
+	const Vector &wi_, const Vector &wh_, const Vector &wir_, const Vector &wor_) const {
+
+	const Spectrum spectrum_1 = Spectrum(1.f);
+
+	Spectrum r(0.f), t, a, f_b;
+	
+	RNG rng;
+
+	Vector wi, wh, wh_min, wh_max, wir, wor;
+	wh_min = Normalize(Vector(wi_.x, wi_.y, 0.f));
+	float angle = 90.f - acosf( wi_.z )/M_PI*180.f;
+	Vector axis = Cross(wi_, Vector(0,0,1));
+	Transform R = Rotate(angle, axis);
+	wh_max = R(Vector(0,0,1));
+
+	if (mf_normal)  
+		wor = SnellDir(wo, etai, etat, wh_);
+	else 
+		wor = SnellDir(wo, etai, etat);
+
+	float pdf_c, pdf_b, u1, u2, s;
+	int n = max(1, nbundles);
+	for (int i = 1 ; i <= n ; i++ )
+	{
+		do {
+			u1 = rng.RandomFloat();
+			u2 = rng.RandomFloat();
+			bxdf_coating->Sample_f(wo, &wi, u1, u2, &pdf_c); // get wi only
+			// adjust wi to placed on a plane defined by wo and wi_
+			s = sqrt(1-wi.z*wi.z);
+			wi.x = wh_min.x * s;
+			wi.y = wh_min.y * s;
+			wh = Normalize(wo + wi);
+		} while ( !bounded(wh, wh_min, wh_max) );
+
+		if (mf_normal)
+			wir = SnellDir(wi_, etai, etat, wh);
+		else
+			wir = SnellDir(wi_, etai, etat);
+
+		t = f21->Evaluate(Dot(wor, wh));
+
+		if (tir)
+			t = spectrum_1 - t * G(wor, wir, Normalize(wir + wor));
+		else
+			t = spectrum_1 - t;
+
+		float cos_wir = CosTheta(wir), cos_wor = CosTheta(wor);
+		if (depth > 0 && cos_wir > 0 && cos_wor > 0 ) 
+			a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
+		else
+			a = 0;
+
+		f_b = bxdf_base->f(wor, wir);
+		pdf_b = bxdf_base->Pdf(wor, wir);
+
+		r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
+		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / pdf_c;
+		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / pdf_b;
+	}
+	
+	r /= n;
+
+    return r;
 }
 	
-Spectrum LayeredBxDF::f_cfg(
+Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
 
 	Spectrum spectrum_1 = Spectrum(1.f);
@@ -213,23 +279,34 @@ Spectrum LayeredBxDF::f_cfg(
 		t = spectrum_1 - t;
 
 	//
-	// Absorbtion
+	// Absorption
+	//
+	Spectrum a;
+	float cos_wir = CosTheta(wir), cos_wor = CosTheta(wor);
+	if (depth > 0 && cos_wir > 0 && cos_wor > 0 ) 
+		a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
+	else
+		a = 0;
+	//
+	// original code for absorption
 	//
 	//float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
 	//Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
-	Spectrum a = spectrum_1;
-	if (depth > 0) 
-		a = Exp(-alpha * depth * (1/CosTheta(wir) + 1/CosTheta(wor)));
 
 	Spectrum f_b = bxdf_base->f(wor, wir);
 
+    //return spectrum_1;
+    //return Spectrum(t);
+	//return a;
+    //return Spectrum(wir.z);
+    //return Spectrum(wh.z);
+    //return Spectrum(CosTheta(wor));
     return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
 }
 
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 
 	Vector wh, wor, wir;
-	Spectrum f_b;
 	wh = (mf_normal ? Normalize(Normalize(wi) + Normalize(wo)) : Vector(0,0,1));
 	//
 	// Note: the below generates error in smp_0 + mfnormal_true
@@ -245,7 +322,7 @@ Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
 		wir = SnellDir(wi, etai, etat);
 	}
 
-	return f_cfg(wi, wh, wir, wor);
+	return f_cfg(wo, wi, wh, wir, wor);
 
 }
 
@@ -273,11 +350,11 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
 		smp_f_b = bxdf_base->Sample_f(smp_wor, &smp_wir, u1, u2, pdf);
 		*wi = smp_wi = SnellDir(smp_wir, etat, etai);
 
-		//return f_cfg(*wi, Normalize(wo+*wi), smp_wir, smp_wor);
+		return f_cfg(wo, *wi, Normalize(wo+*wi), smp_wir, smp_wor);
 		//
 		// Below may result in difference for many metropolis samples.
 		//
-		return f_cfg(*wi, Vector(0,0,1), smp_wir, smp_wor);
+		//return f_cfg(wo, *wi, Vector(0,0,1), smp_wir, smp_wor);
 
 	case 1:
 		/*
@@ -326,7 +403,7 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
     	//*pdf = SameHemisphere(wo, wi) ? AbsCosTheta(wi) * INV_PI : 0.f;
     	//*pdf = AbsCosTheta(smp_wi) * INV_PI; // does not help
 	
-		return f_cfg(*wi, smp_wh, smp_wir, smp_wor);
+		return f_cfg(wo, *wi, smp_wh, smp_wir, smp_wor);
 	}
 #define SMP_0 1
 #ifdef SMP_0
@@ -456,7 +533,7 @@ pdf:	base
 	*pdf = pdf2;
 
 #endif
-    return this->f(wo, *wi);
+    return f(wo, *wi);
 }
 
 float 
