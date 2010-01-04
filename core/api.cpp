@@ -194,7 +194,7 @@ RenderOptions::RenderOptions() {
     FilmName = "image";
     SamplerName = "lowdiscrepancy";
     AcceleratorName = "bvh";
-    RendererName = "sample";
+    RendererName = "sampler";
     SurfIntegratorName = "directlighting";
     VolIntegratorName = "emission";
     CameraName = "perspective";
@@ -1242,8 +1242,8 @@ Renderer *RenderOptions::MakeRenderer() const {
         RendererParams.ReportUnused();
     }
     else {
-        if (RendererName != "sample")
-            Warning("Renderer type \"%s\" unknown.  Using standard.",
+        if (RendererName != "sampler")
+            Warning("Renderer type \"%s\" unknown.  Using \"sampler\".",
                     RendererName.c_str());
         RendererParams.ReportUnused();
         Sampler *sampler = MakeSampler(SamplerName, SamplerParams, camera->film, camera);
