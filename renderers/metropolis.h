@@ -1,6 +1,6 @@
 
 /*
-    pbrt source code Copyright(c) 1998-2009 Matt Pharr and Greg Humphreys.
+    pbrt source code Copyright(c) 1998-2010 Matt Pharr and Greg Humphreys.
 
     This file is part of pbrt.
 
@@ -55,18 +55,15 @@ private:
         MemoryArena &arena, const Camera *camera,
         const Distribution1D *lightDistribution, PathVertex *cameraPath,
         PathVertex *lightPath, RNG &rng) const;
-    Spectrum Lpath(const Scene *scene,
-        const PathVertex *path, int pathLength,
-        MemoryArena &arena, RNG &rng,
-        const vector<LightingSample> &samples,
-        float time, const Distribution1D *lightDistribution,
+    Spectrum Lpath(const Scene *scene, const PathVertex *path, int pathLength,
+        MemoryArena &arena, const vector<LightingSample> &samples,
+        RNG &rng, float time, const Distribution1D *lightDistribution,
         const RayDifferential &escapedRay, const Spectrum &escapedAlpha) const;
     Spectrum Lbidir(const Scene *scene,
         const PathVertex *cameraPath, int cameraPathLength,
         const PathVertex *lightPath, int lightPathLength,
-        MemoryArena &arena, RNG &rng,
-        const vector<LightingSample> &samples, float time,
-        const Distribution1D *lightDistribution,
+        MemoryArena &arena, const vector<LightingSample> &samples,
+        RNG &rng, float time, const Distribution1D *lightDistribution,
         const RayDifferential &escapedRay, const Spectrum &escapedAlpha) const;
 
     // MetropolisRenderer Private Data

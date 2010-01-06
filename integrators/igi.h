@@ -1,6 +1,6 @@
 
 /*
-    pbrt source code Copyright(c) 1998-2009 Matt Pharr and Greg Humphreys.
+    pbrt source code Copyright(c) 1998-2010 Matt Pharr and Greg Humphreys.
 
     This file is part of pbrt.
 
@@ -57,6 +57,7 @@ public:
         nLightSets = RoundUpPow2(ns);
         rrThreshold = rrt;
         maxSpecularDepth = maxd;
+        maxLightDepth = maxd;
         virtualLights.resize(nLightSets);
         gLimit = gl;
         nGatherSamples = ng;
@@ -73,7 +74,7 @@ private:
     float gLimit;
     int nGatherSamples;
     float rrThreshold;
-    int maxSpecularDepth;
+    int maxSpecularDepth, maxLightDepth;
     int vlSetOffset;
     BSDFSampleOffsets gatherSampleOffset;
     vector<vector<VirtualLight> > virtualLights;
