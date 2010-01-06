@@ -223,7 +223,7 @@ Spectrum LayeredBxDF::f_cfg_2( const Vector &wo,
 			s = sqrt(1-wi.z*wi.z);
 			wi.x = wh_min.x * s;
 			wi.y = wh_min.y * s;
-			wh = Normalize(wo + wi);
+			wh = Normalize(Normalize(wo) + Normalize(wi));
 		} while ( !bounded(wh, wh_min, wh_max) );
 
 		if (mf_normal)
@@ -247,9 +247,10 @@ Spectrum LayeredBxDF::f_cfg_2( const Vector &wo,
 		f_b = bxdf_base->f(wor, wir);
 		pdf_b = bxdf_base->Pdf(wor, wir);
 
-		r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
+		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
 		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / pdf_c;
 		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / pdf_b;
+		r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / ( pdf_b * 2.f * M_PI );
 	}
 	
 	r /= n;
