@@ -179,6 +179,10 @@ Spectrum LayeredBxDF::f_cfg( const Vector &wo,
 	switch (configuration) {
 	case 2:
 		return f_cfg_2(wo, wi, wh, wir, wor);
+	case 3:
+		return f_cfg_3(wo, wi, wh, wir, wor);
+	case 4:
+		return f_cfg_4(wo, wi, wh, wir, wor);
 	default:
 		return f_cfg_1(wo, wi, wh, wir, wor);
 	}
@@ -257,7 +261,133 @@ Spectrum LayeredBxDF::f_cfg_2( const Vector &wo,
 
     return r;
 }
+
+Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
+	const Vector &wi_, const Vector &wh_, const Vector &wir_, const Vector &wor_) const {
+
+	const Spectrum spectrum_1 = Spectrum(1.f);
+
+	Spectrum r(0.f), t, a, f_b;
 	
+	Vector wh, wi, wir, wor;
+
+	float pdf_c, u1, u2, d;
+	int n = max(1, nbundles);
+	for (int i = 1 ; i <= n ; i++ )
+	{
+		u1 = rng.RandomFloat();
+		u2 = rng.RandomFloat();
+		//((Microfacet *)bxdf_coating)->distribution->Sample_f(wo_, &wi, u1, u2, &pdf_c); // need to optimize
+		//exponent = ((Blinn *)((Microfacet *)bxdf_coating)->distribution)->exponent;
+
+		// Compute sampled half-angle vector $\wh$ for Blinn distribution
+		float costheta = powf(u1, 1.f / (exponent+1));
+		float sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
+		float phi = u2 * 2.f * M_PI;
+		wh = SphericalDirection(sintheta, costheta, phi);
+		if (!SameHemisphere(wo_, wh)) wh = -wh;
+		d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
+
+#if 0
+		bxdf_coating->Sample_f(wo_, &wi, u1, u2, &pdf_c);
+		wh = Normalize(Normalize(wo_) + Normalize(wi));
+		d = 1;
+#endif
+
+		if (mf_normal)
+		{
+			wir = SnellDir(wi_, etai, etat, wh);
+			wor = SnellDir(wo_, etai, etat, wh);
+		}
+		else
+		{
+			wir = SnellDir(wi_, etai, etat);
+			wor = SnellDir(wo_, etai, etat);
+		}
+
+		t = f21->Evaluate(Dot(wor, wh));
+
+		if (tir)
+			t = spectrum_1 - t * G(wor, wir, Normalize(wir + wor));
+		else
+			t = spectrum_1 - t;
+
+		float cos_wir = CosTheta(wir), cos_wor = CosTheta(wor);
+		if (depth > 0 && cos_wir > 0 && cos_wor > 0 ) 
+			a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
+		else
+			a = 0;
+
+		f_b = bxdf_base->f(wor, wir);
+		//pdf_b = bxdf_base->Pdf(wor, wir);
+
+		r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t;
+		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t / (costheta * d) ;
+		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t * (costheta * d) ;
+		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t * (AbsCosTheta(wh) * d) / pdf_c;
+	}
+	
+	r /= n;
+
+    return r;
+}
+
+#if 1
+Spectrum LayeredBxDF::f_cfg_4( const Vector &wo_,
+	const Vector &wi_, const Vector &wh_, const Vector &wir_, const Vector &wor_) const {
+
+	const Spectrum spectrum_1 = Spectrum(1.f);
+
+	Spectrum r(0.f), t, a, f_b;
+	
+	Vector wh, wi, wir, wor;
+
+	float pdf_c, pdf_b, u1, u2, exponent;
+	int n = max(1, nbundles);
+	for (int i = 1 ; i <= n ; i++ )
+	{
+		u1 = rng.RandomFloat();
+		u2 = rng.RandomFloat();
+
+		bxdf_coating->Sample_f(wo_, &wi, u1, u2, &pdf_c);
+		wh = Normalize(Normalize(wo_) + Normalize(wi));
+
+		if (mf_normal)
+			wor = SnellDir(wo_, etai, etat, wh);
+		else
+			wor = SnellDir(wo_, etai, etat);
+
+		bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf_b);
+
+		if (mf_normal)
+			wi = SnellDir(wir, etat, etai, wh);
+		else
+			wi = SnellDir(wir, etat, etai);
+
+		t = f21->Evaluate(Dot(wor, wh));
+
+		if (tir)
+			t = spectrum_1 - t * G(wor, wir, Normalize(wir + wor));
+		else
+			t = spectrum_1 - t;
+
+		float cos_wir = CosTheta(wir), cos_wor = CosTheta(wor);
+		if (depth > 0 && cos_wir > 0 && cos_wor > 0 ) 
+			a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
+		else
+			a = 0;
+
+		f_b = bxdf_base->f(wor, wir);
+		//pdf_b = bxdf_base->Pdf(wor, wir);
+
+		r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t / pdf_c;
+	}
+	
+	r /= n;
+
+    return r;
+}
+#endif
 Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
 
@@ -367,7 +497,7 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
 		pdf:	coating
 		*/
 		bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
-		break;
+		return f_cfg(wo, *wi, Normalize(wo+*wi), smp_wir, smp_wor);
 	case 3:
 		/*
 		wo: 	given
@@ -698,7 +828,8 @@ Spectrum Microfacet::f(const Vector &wo, const Vector &wi) const {
     float cosThetaH = Dot(wi, wh);
     Spectrum F = fresnel->Evaluate(cosThetaH);
     return R * distribution->D(wh) * G(wo, wi, wh) * F /
-               (4.f * cosThetaI * cosThetaO);
+              (4.f * cosThetaI * cosThetaO);
+    //return F;
 }
 
 

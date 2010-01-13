@@ -42,7 +42,8 @@ public:
                 bool base_only_,
                 int sampling_method_,
                 int configuration_,
-                int nbundles_
+                int nbundles_,
+				float exponent_
 	) 
 	{
         m1 = mat1;
@@ -56,6 +57,7 @@ public:
         sampling_method = sampling_method_;
         configuration = configuration_;
         nbundles = nbundles_;
+		exponent = exponent_;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom,
                   const DifferentialGeometry &dgShading,
@@ -69,6 +71,7 @@ private:
     //Reference<Texture<float> > 	ior;
     float ior;
     float thickness;
+    float exponent;
     Reference<Texture<float> > 	tir; // 1 for TIR computation, otherwise for no consideration.
     //Reference<Texture<float> > 	mf_normal;
     bool mf_normal; // "false" to select a surface normal rather than a MF normal

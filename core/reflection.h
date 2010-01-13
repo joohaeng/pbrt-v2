@@ -264,12 +264,12 @@ public:
     LayeredBxDF(BxDF *b_coating, BxDF *b_base, Fresnel *fresnel_12, Fresnel *fresnel_21, 
 			const Spectrum &absorption, float thickness, float eta_i, float eta_t, 
 			bool doTIR, bool doMFNormal, 
-			int sampling_method_, int configuration_, int nbundles_)
+			int sampling_method_, int configuration_, int nbundles_, float exponent_)
         : BxDF(BxDFType(b_base->type)), bxdf_coating(b_coating), bxdf_base(b_base),
 			f12(fresnel_12), f21(fresnel_21), alpha(absorption), depth(thickness),
 			etai(eta_i), etat(eta_t), tir(doTIR), mf_normal(doMFNormal), 
 			sampling_method(sampling_method_), configuration(configuration_), 
-			nbundles(nbundles_)
+			nbundles(nbundles_), exponent(exponent_)
 	{
     }
     Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
@@ -281,8 +281,9 @@ public:
     }
 	Spectrum f_cfg(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
 	Spectrum f_cfg_1(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
-	Spectrum f_cfg_2(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor
-) const;
+	Spectrum f_cfg_2(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
+	Spectrum f_cfg_3(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
+	Spectrum f_cfg_4(const Vector &wo, const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const;
 
     Spectrum f(const Vector &wo, const Vector &wi) const;
     Spectrum Sample_f(const Vector &wo, Vector *wi, float u1, float u2, float *pdf) const;
@@ -300,6 +301,8 @@ private:
 	int sampling_method; // integer values; each method is coded in sample_f()
 	int configuration;
 	int nbundles;
+	RNG rng;
+	float exponent;
 };
 
 class FresnelConductor : public Fresnel {
@@ -438,10 +441,10 @@ public:
     Spectrum Sample_f(const Vector &wo, Vector *wi,
                               float u1, float u2, float *pdf) const;
     float Pdf(const Vector &wo, const Vector &wi) const;
+    MicrofacetDistribution *distribution;
 private:
     // Microfacet Private Data
     Spectrum R;
-    MicrofacetDistribution *distribution;
     Fresnel *fresnel;
 };
 
@@ -457,8 +460,8 @@ public:
     }
     virtual void Sample_f(const Vector &wi, Vector *sampled_f, float u1, float u2, float *pdf) const;
     virtual float Pdf(const Vector &wi, const Vector &wo) const;
-private:
     float exponent;
+private:
 };
 
 

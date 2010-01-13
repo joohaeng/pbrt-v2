@@ -53,6 +53,8 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
 
     Spectrum a = absorption->Evaluate(dgShading).Clamp();
     float d = thickness;
+	//float exponent = ((Blinn *)((Microfacet *)b1->bxdfs[0])->distribution)->exponent;
+	//fprintf(stderr,">>> exponent: %f\n", exponent);
 
     // Create a layered material on top of base b2 considering the paramters of coating b1: 
 	// Fresnel, absorption, depth
@@ -61,7 +63,7 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
 		for (int i = 0; i < n2; ++i)
 			b1->Add(BSDF_ALLOC(arena, LayeredBxDF)(b1->bxdfs[0], b2->bxdfs[i], 
 						f12, f21, a, d, eta_i, eta_t, doTIR, mf_normal, 
-						sampling_method, configuration, nbundles));
+						sampling_method, configuration, nbundles, exponent));
 		return b1;
 	} 
 	else {
@@ -69,7 +71,7 @@ BSDF *LayeredMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
 		for (int i = 0; i < n2; ++i)
 			b3->Add(BSDF_ALLOC(arena, LayeredBxDF)(b1->bxdfs[0], b2->bxdfs[i], 
 						f12, f21, a, d, eta_i, eta_t, doTIR, mf_normal, 
-						sampling_method, configuration, nbundles));
+						sampling_method, configuration, nbundles, exponent));
 		return b3;
 	}
 	//else 
@@ -85,6 +87,7 @@ LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
 	// ior of m1 (coating layer): default 1.5 for glass
     float ior 	= mp.FindFloat("ior", float(1.5f));
     float d 	= mp.FindFloat("thickness", float(1.0f));
+    float exponent = mp.FindFloat("exponent", float(10000.0f));
 	// 1.0f for TIR computation, otherwise for no consideration
     Reference<Texture<float> > tir = mp.GetFloatTexture("tir", float(1.0f)); 
 	// "mfnormal = false" means every normal is fixed to (0,0,1)
@@ -92,5 +95,5 @@ LayeredMaterial *CreateLayeredMaterial(const Transform &xform,
     bool baseonly = mp.FindBool("baseonly", true); 
     Reference<Texture<Spectrum> > a = mp.GetSpectrumTexture("absorption", Spectrum(0.1));
     return new LayeredMaterial(m1, m2, ior, d, a, tir, mfnormal, baseonly, 
-			sampling_method, configuration, nbundles);
+			sampling_method, configuration, nbundles, exponent);
 }
