@@ -15,11 +15,12 @@ DEFS+= -DNDEBUG
 
 # 32 bit
 #DEFS+=-DPBRT_POINTER_SIZE=4
-#MARCH=-m32
+#MARCH=-m32 -msse2 -mfpmath=sse
 
 # 64 bit
 DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
 MARCH=-m64
+OPT=-O2
 
 #########################################################################
  
@@ -40,12 +41,11 @@ endif
  
 CC=gcc
 CXX=g++
-LD=$(CXX) $(OPT)
-OPT=-O2 $(MARCH) -msse2 -mfpmath=sse
-INCLUDE=-I. -Icore $(EXRINCLUDE)
+LD=$(CXX) $(OPT) $(MARCH)
+INCLUDE=-I. -Icore $(EXRINCLUDE) -I/usr/local/include -I/opt/local/include
 WARN=-Wall
 CWD=$(shell pwd)
-CXXFLAGS=$(OPT) $(INCLUDE) $(WARN) $(DEFS)
+CXXFLAGS=$(OPT) $(MARCH) $(INCLUDE) $(WARN) $(DEFS)
 CCFLAGS=$(CXXFLAGS)
 LIBS=$(LEXLIB) $(EXRLIBDIR) $(EXRLIBS) -lm 
 
@@ -59,8 +59,10 @@ LIBOBJS=$(addprefix objs/, $(subst /,_,$(LIBSRCS:.cpp=.o)))
  
 HEADERS = $(wildcard */*.h)
  
-default: bin/pbrt #tools/bsdftest
- 
+default: dirs bin/pbrt bin/bsdftest bin/exravg bin/exrdiff bin/exrtotiff bin/tifftoexr
+
+bin/%: dirs
+
 pbrt: bin/pbrt
  
 dirs:
@@ -134,9 +136,21 @@ objs/pbrt.o: main/pbrt.cpp
 	@echo "Building object $@"
 	@$(CXX) $(CXXFLAGS) -o $@ -c $<
  
-bin/pbrt: dirs objs/libpbrt.a objs/pbrt.o
+objs/%.o: tools/%.cpp
+	@echo "Building object $@"
+	@$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+bin/%: objs/%.o objs/libpbrt.a 
 	@echo "Linking $@"
-	@$(CXX) $(CXXFLAGS) -o $@ objs/pbrt.o objs/libpbrt.a $(LIBS)
+	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+
+bin/exrtotiff: objs/exrtotiff.o 
+	@echo "Linking $@"
+	@$(CXX) $(CXXFLAGS) -o $@ $^ -ltiff $(LIBS) 
+
+bin/tifftoexr: objs/tifftoexr.o 
+	@echo "Linking $@"
+	@$(CXX) $(CXXFLAGS) -o $@ $^ -ltiff $(LIBS) 
 
 tools/bsdftest: objs/libpbrt.a
 	@echo -n Buidling tools/bsdftest
