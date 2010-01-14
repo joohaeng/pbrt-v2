@@ -251,10 +251,10 @@ Spectrum LayeredBxDF::f_cfg_2( const Vector &wo,
 		f_b = bxdf_base->f(wor, wir);
 		pdf_b = bxdf_base->Pdf(wor, wir);
 
-		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
+		r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
 		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / pdf_c;
 		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / pdf_b;
-		r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / ( pdf_b * 2.f * M_PI );
+		//r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t / ( pdf_b * 2.f * M_PI );
 	}
 	
 	r /= n;
@@ -266,19 +266,14 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 	const Vector &wi_, const Vector &wh_, const Vector &wir_, const Vector &wor_) const {
 
 	const Spectrum spectrum_1 = Spectrum(1.f);
-
 	Spectrum r(0.f), t, a, f_b;
-	
 	Vector wh, wi, wir, wor;
-
 	float pdf_c, u1, u2, d;
 	int n = max(1, nbundles);
 	for (int i = 1 ; i <= n ; i++ )
 	{
 		u1 = rng.RandomFloat();
 		u2 = rng.RandomFloat();
-		//((Microfacet *)bxdf_coating)->distribution->Sample_f(wo_, &wi, u1, u2, &pdf_c); // need to optimize
-		//exponent = ((Blinn *)((Microfacet *)bxdf_coating)->distribution)->exponent;
 
 		// Compute sampled half-angle vector $\wh$ for Blinn distribution
 		float costheta = powf(u1, 1.f / (exponent+1));
@@ -288,19 +283,10 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 		if (!SameHemisphere(wo_, wh)) wh = -wh;
 		d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
 
-#if 0
-		bxdf_coating->Sample_f(wo_, &wi, u1, u2, &pdf_c);
-		wh = Normalize(Normalize(wo_) + Normalize(wi));
-		d = 1;
-#endif
-
-		if (mf_normal)
-		{
+		if (mf_normal) {
 			wir = SnellDir(wi_, etai, etat, wh);
 			wor = SnellDir(wo_, etai, etat, wh);
-		}
-		else
-		{
+		} else {
 			wir = SnellDir(wi_, etai, etat);
 			wor = SnellDir(wo_, etai, etat);
 		}
@@ -319,14 +305,9 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 			a = 0;
 
 		f_b = bxdf_base->f(wor, wir);
-		//pdf_b = bxdf_base->Pdf(wor, wir);
 
 		r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t;
-		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t / (costheta * d) ;
-		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t * (costheta * d) ;
-		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t * (AbsCosTheta(wh) * d) / pdf_c;
 	}
-	
 	r /= n;
 
     return r;
