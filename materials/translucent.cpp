@@ -31,7 +31,7 @@
 
 // TranslucentMaterial Method Definitions
 BSDF *TranslucentMaterial::GetBSDF(const DifferentialGeometry &dgGeom, const DifferentialGeometry &dgShading, MemoryArena &arena) const {
-    float ior = 1.5f;
+    //float ior = 1.5f;
     DifferentialGeometry dgs;
     if (bumpMap)
         Bump(bumpMap, dgGeom, dgShading, &dgs);
@@ -74,7 +74,9 @@ TranslucentMaterial *CreateTranslucentMaterial(const Transform &xform,
     Reference<Texture<Spectrum> > transmit = mp.GetSpectrumTexture("transmit", Spectrum(0.5f));
     Reference<Texture<float> > roughness = mp.GetFloatTexture("roughness", .1f);
     Reference<Texture<float> > bumpMap = mp.GetFloatTexture("bumpmap", 0.f);
-    return new TranslucentMaterial(Kd, Ks, roughness, reflect, transmit, bumpMap);
+	float ior 	= mp.FindFloat("ior", float(1.5f));
+    //return new TranslucentMaterial(Kd, Ks, roughness, reflect, transmit, bumpMap);
+    return new TranslucentMaterial(Kd, Ks, roughness, reflect, transmit, bumpMap, ior);
 }
 
 

@@ -36,13 +36,15 @@ public:
             Reference<Texture<float> > rough,
             Reference<Texture<Spectrum> > refl,
             Reference<Texture<Spectrum> > trans,
-            Reference<Texture<float> > bump) {
+            Reference<Texture<float> > bump,
+			float ior_) {
         Kd = kd;
         Ks = ks;
         roughness = rough;
         reflect = refl;
         transmit = trans;
         bumpMap = bump;
+		ior = ior_;
     }
     BSDF *GetBSDF(const DifferentialGeometry &dgGeom, const
         DifferentialGeometry &dgShading, MemoryArena &arena) const;
@@ -52,6 +54,7 @@ private:
     Reference<Texture<float> > roughness;
     Reference<Texture<Spectrum> > reflect, transmit;
     Reference<Texture<float> > bumpMap;
+	float ior;
 };
 
 

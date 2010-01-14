@@ -36,7 +36,8 @@ BSDF *GlassMaterial::GetBSDF(const DifferentialGeometry &dgGeom, const Different
         Bump(bumpMap, dgGeom, dgShading, &dgs);
     else
         dgs = dgShading;
-    float ior = index->Evaluate(dgs);
+    //float ior = index->Evaluate(dgs);
+    float ior = index;
     BSDF *bsdf = BSDF_ALLOC(arena, BSDF)(dgs, dgGeom.nn, ior);
     Spectrum R = Kr->Evaluate(dgs).Clamp();
     Spectrum T = Kt->Evaluate(dgs).Clamp();
@@ -53,7 +54,8 @@ GlassMaterial *CreateGlassMaterial(const Transform &xform,
         const TextureParams &mp) {
     Reference<Texture<Spectrum> > Kr = mp.GetSpectrumTexture("Kr", Spectrum(1.f));
     Reference<Texture<Spectrum> > Kt = mp.GetSpectrumTexture("Kt", Spectrum(1.f));
-    Reference<Texture<float> > index = mp.GetFloatTexture("index", 1.5f);
+    //Reference<Texture<float> > index = mp.GetFloatTexture("index", 1.5f);
+	float index	= mp.FindFloat("ior", float(1.5f));
     Reference<Texture<float> > bumpMap = mp.GetFloatTexture("bumpmap", 0.f);
     return new GlassMaterial(Kr, Kt, index, bumpMap);
 }
