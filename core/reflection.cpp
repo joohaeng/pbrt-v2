@@ -266,21 +266,16 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 	const Vector &wi_, const Vector &wh_, const Vector &wir_, const Vector &wor_) const {
 
 	const Spectrum spectrum_1 = Spectrum(1.f);
-
 	Spectrum r(0.f), t, a, f_b;
-	
 	Vector wh, wi, wir, wor;
-
 	float pdf_c, u1, u2, d;
 	int n = max(1, nbundles);
 	for (int i = 1 ; i <= n ; i++ )
 	{
 		u1 = rng.RandomFloat();
 		u2 = rng.RandomFloat();
-		//((Microfacet *)bxdf_coating)->distribution->Sample_f(wo_, &wi, u1, u2, &pdf_c); // need to optimize
-		//exponent = ((Blinn *)((Microfacet *)bxdf_coating)->distribution)->exponent;
 
-		// Compute sampled half-angle vector $\wh$ for Blinn distribution
+		// Compute sampled half-angle vector $\wh$ from Blinn distribution
 		float costheta = powf(u1, 1.f / (exponent+1));
 		float sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
 		float phi = u2 * 2.f * M_PI;
@@ -288,19 +283,10 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 		if (!SameHemisphere(wo_, wh)) wh = -wh;
 		d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
 
-#if 0
-		bxdf_coating->Sample_f(wo_, &wi, u1, u2, &pdf_c);
-		wh = Normalize(Normalize(wo_) + Normalize(wi));
-		d = 1;
-#endif
-
-		if (mf_normal)
-		{
+		if (mf_normal) {
 			wir = SnellDir(wi_, etai, etat, wh);
 			wor = SnellDir(wo_, etai, etat, wh);
-		}
-		else
-		{
+		} else {
 			wir = SnellDir(wi_, etai, etat);
 			wor = SnellDir(wo_, etai, etat);
 		}
@@ -319,14 +305,9 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 			a = 0;
 
 		f_b = bxdf_base->f(wor, wir);
-		//pdf_b = bxdf_base->Pdf(wor, wir);
 
 		r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t;
-		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t / (costheta * d) ;
-		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t * (costheta * d) ;
-		//r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t * (AbsCosTheta(wh) * d) / pdf_c;
 	}
-	
 	r /= n;
 
     return r;
@@ -418,20 +399,9 @@ Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 		a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
 	else
 		a = 0;
-	//
-	// original code for absorption
-	//
-	//float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
-	//Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
 
 	Spectrum f_b = bxdf_base->f(wor, wir);
 
-    //return spectrum_1;
-    //return Spectrum(t);
-	//return a;
-    //return Spectrum(wir.z);
-    //return Spectrum(wh.z);
-    //return Spectrum(CosTheta(wor));
     return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
 }
 
