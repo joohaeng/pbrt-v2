@@ -43,7 +43,7 @@ BSDF *PlasticMaterial::GetBSDF(const DifferentialGeometry &dgGeom,
     Spectrum kd = Kd->Evaluate(dgs).Clamp();
     BxDF *diff = BSDF_ALLOC(arena, Lambertian)(kd);
     //Fresnel *fresnel = BSDF_ALLOC(arena, FresnelDielectric)(1.5f, 1.f);
-    Fresnel *fresnel = BSDF_ALLOC(arena, FresnelDielectric)(1.f, 1.5f);
+    Fresnel *fresnel = BSDF_ALLOC(arena, FresnelDielectric)(1.f, ior);
     Spectrum ks = Ks->Evaluate(dgs).Clamp();
     float rough = roughness->Evaluate(dgs);
     BxDF *spec = BSDF_ALLOC(arena, Microfacet)
@@ -60,7 +60,8 @@ PlasticMaterial *CreatePlasticMaterial(const Transform &xform,
     Reference<Texture<Spectrum> > Ks = mp.GetSpectrumTexture("Ks", Spectrum(1.f));
     Reference<Texture<float> > roughness = mp.GetFloatTexture("roughness", .1f);
     Reference<Texture<float> > bumpMap = mp.GetFloatTexture("bumpmap", 0.f);
-    return new PlasticMaterial(Kd, Ks, roughness, bumpMap);
+	float ior	= mp.FindFloat("ior", float(1.5f));
+    return new PlasticMaterial(Kd, Ks, roughness, bumpMap, ior);
 }
 
 

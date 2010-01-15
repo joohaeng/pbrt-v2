@@ -275,7 +275,7 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 		u1 = rng.RandomFloat();
 		u2 = rng.RandomFloat();
 
-		// Compute sampled half-angle vector $\wh$ for Blinn distribution
+		// Compute sampled half-angle vector $\wh$ from Blinn distribution
 		float costheta = powf(u1, 1.f / (exponent+1));
 		float sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
 		float phi = u2 * 2.f * M_PI;
@@ -399,20 +399,9 @@ Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 		a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
 	else
 		a = 0;
-	//
-	// original code for absorption
-	//
-	//float tmp =	depth * (1.0f/CosTheta(wir) + 1.0f/CosTheta(wor));
-	//Spectrum a = (tmp > 0 ? Exp(-alpha * tmp) : spectrum_1);
 
 	Spectrum f_b = bxdf_base->f(wor, wir);
 
-    //return spectrum_1;
-    //return Spectrum(t);
-	//return a;
-    //return Spectrum(wir.z);
-    //return Spectrum(wh.z);
-    //return Spectrum(CosTheta(wor));
     return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
 }
 
