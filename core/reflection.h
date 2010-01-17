@@ -31,6 +31,7 @@
 #include "rng.h"
 #include "spectrum.h"
 #include "kdtree.h"
+#include "timer.h"
 
 // Reflection Declarations
 Spectrum FrDiel(float cosi, float cost, const Spectrum &etai,
@@ -271,6 +272,9 @@ public:
 			sampling_method(sampling_method_), configuration(configuration_), 
 			nbundles(nbundles_), exponent(exponent_)
 	{
+		struct timeval t;
+		gettimeofday( &t, NULL );
+		rng.Seed(t.tv_usec);
     }
     Spectrum rho(const Vector &w, int nSamples, const float *samples) const {
         return bxdf_base->rho(w, nSamples, samples);
@@ -441,11 +445,11 @@ public:
     Spectrum Sample_f(const Vector &wo, Vector *wi,
                               float u1, float u2, float *pdf) const;
     float Pdf(const Vector &wo, const Vector &wi) const;
-    MicrofacetDistribution *distribution;
 private:
     // Microfacet Private Data
     Spectrum R;
     Fresnel *fresnel;
+    MicrofacetDistribution *distribution;
 };
 
 

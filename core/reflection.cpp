@@ -268,20 +268,22 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 	const Spectrum spectrum_1 = Spectrum(1.f);
 	Spectrum r(0.f), t, a, f_b;
 	Vector wh, wi, wir, wor;
-	float pdf_c, u1, u2, d;
+	float u1, u2, costheta, sintheta, phi, cos_wir, cos_wor;
 	int n = max(1, nbundles);
+	//fprintf(stdout,">>> RNG start\n");
 	for (int i = 1 ; i <= n ; i++ )
 	{
 		u1 = rng.RandomFloat();
 		u2 = rng.RandomFloat();
+		//fprintf(stdout,">>>>>> (u1,u2)=(%f,%f)\n", u1, u2);
 
 		// Compute sampled half-angle vector $\wh$ from Blinn distribution
-		float costheta = powf(u1, 1.f / (exponent+1));
-		float sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
-		float phi = u2 * 2.f * M_PI;
+		costheta = powf(u1, 1.f / (exponent+1));
+		sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
+		phi = u2 * TWOPI;
 		wh = SphericalDirection(sintheta, costheta, phi);
 		if (!SameHemisphere(wo_, wh)) wh = -wh;
-		d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
+		//d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
 
 		if (mf_normal) {
 			wir = SnellDir(wi_, etai, etat, wh);
@@ -298,7 +300,8 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 		else
 			t = spectrum_1 - t;
 
-		float cos_wir = CosTheta(wir), cos_wor = CosTheta(wor);
+		cos_wir = CosTheta(wir); 
+		cos_wor = CosTheta(wor);
 		if (depth > 0 && cos_wir > 0 && cos_wor > 0 ) 
 			a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
 		else
@@ -323,7 +326,7 @@ Spectrum LayeredBxDF::f_cfg_4( const Vector &wo_,
 	
 	Vector wh, wi, wir, wor;
 
-	float pdf_c, pdf_b, u1, u2, exponent;
+	float pdf_c, pdf_b, u1, u2;
 	int n = max(1, nbundles);
 	for (int i = 1 ; i <= n ; i++ )
 	{
