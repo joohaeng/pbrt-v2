@@ -321,32 +321,38 @@ Spectrum LayeredBxDF::f_cfg_4( const Vector &wo_,
 	const Vector &wi_, const Vector &wh_, const Vector &wir_, const Vector &wor_) const {
 
 	const Spectrum spectrum_1 = Spectrum(1.f);
-
 	Spectrum r(0.f), t, a, f_b;
-	
 	Vector wh, wi, wir, wor;
-
-	float pdf_c, pdf_b, u1, u2;
+	float u1, u2, costheta, sintheta, phi, cos_wir, cos_wor;
 	int n = max(1, nbundles);
+	//fprintf(stdout,">>> RNG start\n");
 	for (int i = 1 ; i <= n ; i++ )
 	{
-		u1 = rng.RandomFloat();
-		u2 = rng.RandomFloat();
+		if (i > 1) {
+			u1 = rng.RandomFloat();
+			u2 = rng.RandomFloat();
+			//fprintf(stdout,">>>>>> (u1,u2)=(%f,%f)\n", u1, u2);
 
-		bxdf_coating->Sample_f(wo_, &wi, u1, u2, &pdf_c);
-		wh = Normalize(Normalize(wo_) + Normalize(wi));
+			// Compute sampled half-angle vector $\wh$ from Blinn distribution
+			costheta = powf(u1, 1.f / (exponent+1));
+			sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
+			phi = u2 * TWOPI;
+			wh = SphericalDirection(sintheta, costheta, phi);
+			if (!SameHemisphere(wo_, wh)) wh = -wh;
+			//d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
 
-		if (mf_normal)
-			wor = SnellDir(wo_, etai, etat, wh);
-		else
-			wor = SnellDir(wo_, etai, etat);
-
-		bxdf_base->Sample_f(wor, &wir, u1, u2, &pdf_b);
-
-		if (mf_normal)
-			wi = SnellDir(wir, etat, etai, wh);
-		else
-			wi = SnellDir(wir, etat, etai);
+			if (mf_normal) {
+				wir = SnellDir(wi_, etai, etat, wh);
+				wor = SnellDir(wo_, etai, etat, wh);
+			} else {
+				wir = SnellDir(wi_, etai, etat);
+				wor = SnellDir(wo_, etai, etat);
+			}
+		} else {
+			wh = wh_;
+			wir = wir_;
+			wor = wor_;
+		}
 
 		t = f21->Evaluate(Dot(wor, wh));
 
@@ -355,18 +361,17 @@ Spectrum LayeredBxDF::f_cfg_4( const Vector &wo_,
 		else
 			t = spectrum_1 - t;
 
-		float cos_wir = CosTheta(wir), cos_wor = CosTheta(wor);
+		cos_wir = CosTheta(wir); 
+		cos_wor = CosTheta(wor);
 		if (depth > 0 && cos_wir > 0 && cos_wor > 0 ) 
 			a = Exp(-alpha * depth * (1/cos_wir + 1/cos_wor));
 		else
 			a = 0;
 
 		f_b = bxdf_base->f(wor, wir);
-		//pdf_b = bxdf_base->Pdf(wor, wir);
 
-		r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t / pdf_c;
+		r += (spectrum_1 - f12->Evaluate(Dot(wi_, wh))) * f_b * a * t;
 	}
-	
 	r /= n;
 
     return r;
