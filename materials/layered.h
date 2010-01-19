@@ -72,10 +72,8 @@ private:
     float ior;
     float thickness;
     float exponent;
-    Reference<Texture<float> > 	tir; // 1 for TIR computation, otherwise for no consideration.
-    //Reference<Texture<float> > 	mf_normal;
+    bool tir; // "true" for TIR computation, otherwise skip it
     bool mf_normal; // "false" to select a surface normal rather than a MF normal
-    //Reference<Texture<float> > 	base_only;
     bool base_only; // "true" to neglect the effect of coating layer
     Reference<Texture<Spectrum> > absorption;
 };
