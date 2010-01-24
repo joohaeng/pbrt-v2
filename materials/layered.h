@@ -37,7 +37,7 @@ public:
                 float ior_,
                 float thickness_,
                 const Reference<Texture<Spectrum> > &a,
-                const Reference<Texture<float> > &tir_,
+                bool tir_,
                 bool mf_normal_,
                 bool base_only_,
                 int sampling_method_,

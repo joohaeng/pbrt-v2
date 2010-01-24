@@ -265,6 +265,8 @@ Spectrum LayeredBxDF::f_cfg_2( const Vector &wo,
 Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 	const Vector &wi_, const Vector &wh_, const Vector &wir_, const Vector &wor_) const {
 
+	if ( depth <= 0 ) return 0;
+
 	const Spectrum spectrum_1 = Spectrum(1.f);
 	Spectrum r(0.f), t, a, f_b;
 	Vector wh, wi, wir, wor;
@@ -296,7 +298,7 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 		t = f21->Evaluate(Dot(wor, wh));
 
 		if (tir)
-			t = spectrum_1 - t * G(wor, wir, Normalize(wir + wor));
+			t = spectrum_1 - t * G(wor, wir, wh);
 		else
 			t = spectrum_1 - t;
 
@@ -380,6 +382,8 @@ Spectrum LayeredBxDF::f_cfg_4( const Vector &wo_,
 Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 	const Vector &wi, const Vector &wh, const Vector &wir, const Vector &wor) const {
 
+	if ( depth <= 0 ) return 0;
+
 	Spectrum spectrum_1 = Spectrum(1.f);
 	Spectrum t = f21->Evaluate(Dot(wor, wh));
 
@@ -394,7 +398,7 @@ Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 	//
 	//t = spectrum_1 - ( tir ? t * G(wor, wir, Normalize(wir + wor)) : t);
 	if (tir)
-		t = spectrum_1 - t * G(wor, wir, Normalize(wir + wor));
+		t = spectrum_1 - t * G(wor, wir, wh);
 	else
 		t = spectrum_1 - t;
 
@@ -468,14 +472,37 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
 	case 1:
 		/*
 		wo: 	given
-		wh:		not considered
-		wor: 	not considered
-		wir: 	not considered
+		wh:		(wo+wi)/2
+		wor: 	Snell's law
+		wir: 	Snell's law
 		wi:		BRDF sampling at the coating
 		pdf:	coating
 		*/
 		bxdf_coating->Sample_f(wo, wi, u1, u2, pdf); // get wi only
-		return f_cfg(wo, *wi, Normalize(wo+*wi), smp_wir, smp_wor);
+		smp_wi = *wi;
+		smp_wh 	= Normalize(wo + smp_wi);
+		smp_wor = SnellDir(wo, etai, etat, smp_wh);
+		smp_wir = SnellDir(smp_wi, etai, etat, smp_wh);
+		return f_cfg(wo, smp_wi, smp_wh, smp_wir, smp_wor);
+
+	case 2:
+		float u1, u2, costheta, sintheta, phi;
+		u1 = rng.RandomFloat();
+		u2 = rng.RandomFloat();
+
+		// Compute sampled half-angle vector $\wh$ from Blinn distribution
+		costheta = powf(u1, 1.f / (exponent+1));
+		sintheta = sqrtf(max(0.f, 1.f - costheta*costheta));
+		phi = u2 * TWOPI;
+		smp_wh = SphericalDirection(sintheta, costheta, phi);
+		if (!SameHemisphere(wo, smp_wh)) smp_wh = -smp_wh;
+
+		smp_wor = SnellDir(wo, etai, etat, smp_wh);
+		bxdf_base->Sample_f(smp_wor, &smp_wir, u1, u2, pdf);
+		*wi = smp_wi = SnellDir(smp_wir, etat, etai, smp_wh);
+
+		return f_cfg(wo, *wi, smp_wh, smp_wir, smp_wor);
+
 	case 3:
 		/*
 		wo: 	given
