@@ -287,12 +287,17 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 		if (!SameHemisphere(wo_, wh)) wh = -wh;
 		//d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
 
-		if (mf_normal) {
-			wir = SnellDir(wi_, etai, etat, wh);
-			wor = SnellDir(wo_, etai, etat, wh);
+		if ( n == 1 ) {
+			wir = wir_;
+			wor = wor_;
 		} else {
-			wir = SnellDir(wi_, etai, etat);
-			wor = SnellDir(wo_, etai, etat);
+			if (mf_normal) {
+				wir = SnellDir(wi_, etai, etat, wh);
+				wor = SnellDir(wo_, etai, etat, wh);
+			} else {
+				wir = SnellDir(wi_, etai, etat);
+				wor = SnellDir(wo_, etai, etat);
+			}
 		}
 
 		t = f21->Evaluate(Dot(wor, wh));
@@ -385,7 +390,6 @@ Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 	if ( depth <= 0 ) return 0;
 
 	Spectrum spectrum_1 = Spectrum(1.f);
-	Spectrum r(0.f);
 	Spectrum t = f21->Evaluate(Dot(wor, wh));
 
 	//
@@ -415,9 +419,7 @@ Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 
 	Spectrum f_b = bxdf_base->f(wor, wir);
 
-    r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
-
-	return r;
+    return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
 }
 
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
@@ -489,7 +491,7 @@ Spectrum LayeredBxDF::Sample_f(const Vector &wo, Vector *wi,
 		return f_cfg(wo, smp_wi, smp_wh, smp_wir, smp_wor);
 
 	case 2:
-		float u1, u2, costheta, sintheta, phi;
+		float costheta, sintheta, phi;
 		u1 = rng.RandomFloat();
 		u2 = rng.RandomFloat();
 
