@@ -286,18 +286,12 @@ Spectrum LayeredBxDF::f_cfg_3( const Vector &wo_,
 		wh = SphericalDirection(sintheta, costheta, phi);
 		if (!SameHemisphere(wo_, wh)) wh = -wh;
 		//d = (exponent+2) * INV_TWOPI * powf(AbsCosTheta(wh), exponent);
-
-		if ( n == 1 ) {
-			wir = wir_;
-			wor = wor_;
+		if (mf_normal) {
+			wir = SnellDir(wi_, etai, etat, wh);
+			wor = SnellDir(wo_, etai, etat, wh);
 		} else {
-			if (mf_normal) {
-				wir = SnellDir(wi_, etai, etat, wh);
-				wor = SnellDir(wo_, etai, etat, wh);
-			} else {
-				wir = SnellDir(wi_, etai, etat);
-				wor = SnellDir(wo_, etai, etat);
-			}
+			wir = SnellDir(wi_, etai, etat);
+			wor = SnellDir(wo_, etai, etat);
 		}
 
 		t = f21->Evaluate(Dot(wor, wh));
