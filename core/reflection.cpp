@@ -385,6 +385,7 @@ Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 	if ( depth <= 0 ) return 0;
 
 	Spectrum spectrum_1 = Spectrum(1.f);
+	Spectrum r(0.f);
 	Spectrum t = f21->Evaluate(Dot(wor, wh));
 
 	//
@@ -414,7 +415,9 @@ Spectrum LayeredBxDF::f_cfg_1( const Vector &wo,
 
 	Spectrum f_b = bxdf_base->f(wor, wir);
 
-    return (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
+    r += (spectrum_1 - f12->Evaluate(Dot(wi, wh))) * f_b * a * t;
+
+	return r;
 }
 
 Spectrum LayeredBxDF::f(const Vector &wo, const Vector &wi) const {
