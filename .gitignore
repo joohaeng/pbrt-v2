@@ -13,3 +13,6 @@ objs/*.a
 scenes/*.exr
 scenes/*.log
 scenes/*.tiff
+*.pyc
+*~
+.sconsign.dblite
