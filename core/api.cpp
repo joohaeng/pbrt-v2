@@ -101,6 +101,7 @@
 #include "shapes/paraboloid.h"
 #include "shapes/sphere.h"
 #include "shapes/trianglemesh.h"
+#include "shapes/Wavefront.h"
 #include "textures/bilerp.h"
 #include "textures/checkerboard.h"
 #include "textures/constant.h"
@@ -328,6 +329,9 @@ Reference<Shape> MakeShape(const string &name,
                                    paramSet);
     else if (name == "trianglemesh")
         s = CreateTriangleMeshShape(object2world, world2object, reverseOrientation,
+                                    paramSet, &graphicsState.floatTextures);
+    else if (name == "wavefront")
+        s = CreateWavefrontShape(object2world, world2object, reverseOrientation,
                                     paramSet, &graphicsState.floatTextures);
     else if (name == "heightfield")
         s = CreateHeightfieldShape(object2world, world2object, reverseOrientation,
