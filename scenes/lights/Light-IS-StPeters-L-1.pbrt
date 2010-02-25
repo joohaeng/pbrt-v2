@@ -1,0 +1,7 @@
+AttributeBegin
+LightSource "infinite"
+    "string mapname"
+	["textures/stpeters_latlong.exr"]
+    Include "Lights/LightSample.pbrt"
+    "color L" [1 1 1]
+AttributeEnd

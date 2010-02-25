@@ -1,0 +1,293 @@
+#
+# Material library
+#
+# It may slow down the rendering processing to load this materials.
+#
+# Author: Joo-Haeng Lee ( joohaeng at gmail dot com )
+# Date:	2009-12-01
+#
+
+Texture "on" 	"float" "constant" "float value" [1]
+Texture "off" 	"float" "constant" "float value" [0]
+Texture "3rd" 	"float" "constant" "float value" [2] # 3rd option
+Texture "const_float_zero" 	"float" "constant" "float value" [0]
+Texture "const_float_0" 	"float" "constant" "float value" [0]
+Texture "const_float_0.01" 	"float" "constant" "float value" [0.01]
+Texture "const_float_0.1" 	"float" "constant" "float value" [0.1]
+Texture "const_float_0.2" 	"float" "constant" "float value" [0.2]
+Texture "const_float_0.3" 	"float" "constant" "float value" [0.3]
+Texture "const_float_0.4" 	"float" "constant" "float value" [0.4]
+Texture "const_float_0.5" 	"float" "constant" "float value" [0.5]
+Texture "const_float_one" 	"float" "constant" "float value" [1]
+Texture "const_float_1" 	"float" "constant" "float value" [1]
+Texture "const_float_1.0" 	"float" "constant" "float value" [1]
+Texture "const_float_1.1" 	"float" "constant" "float value" [1.1]
+Texture "const_float_1.2" 	"float" "constant" "float value" [1.2]
+Texture "const_float_1.3" 	"float" "constant" "float value" [1.3]
+Texture "const_float_1.4" 	"float" "constant" "float value" [1.4]
+Texture "const_float_1.5" 	"float" "constant" "float value" [1.5]
+Texture "const_float_1.6" 	"float" "constant" "float value" [1.6]
+Texture "const_float_1.7" 	"float" "constant" "float value" [1.7]
+Texture "const_float_1.8" 	"float" "constant" "float value" [1.8]
+Texture "const_float_2.0" 	"float" "constant" "float value" [2]
+Texture "const_float_3.0" 	"float" "constant" "float value" [3]
+Texture "const_float_5" 	"float" "constant" "float value" [5]
+Texture "const_float_5.0" 	"float" "constant" "float value" [5]
+Texture "const" "color" "constant" "color value" [0.1 0.1 0.1]
+Texture "checkerboard" "color" "checkerboard" "float uscale" [0.001] "float vscale" [0.001]
+
+#
+# Mirror
+#
+MakeNamedMaterial "mirror" "string type" 
+	"mirror"
+#
+# Metal
+#
+MakeNamedMaterial "metal" "string type" 
+	"metal"
+MakeNamedMaterial "metal_flat" "string type" 
+	"metal"
+	"texture roughness" "const_float_zero"
+MakeNamedMaterial "metal_glossy" "string type" 
+	"metal"
+	"texture roughness" "const_float_0.01"
+MakeNamedMaterial "metal_rough" "string type" 
+	"metal"
+	"texture roughness" "const_float_one"
+#
+# matte
+#
+MakeNamedMaterial "matte_white" "string type" 
+	"matte"
+	"float sigma" [0]
+	"color Kd" [1 1 1]
+MakeNamedMaterial "matte_white_rough" "string type" 
+	"matte"
+	"float sigma" [10]
+	"color Kd" [1 1 1]
+MakeNamedMaterial "matte" "string type" 
+	"matte"
+	"float sigma" [0]
+	"color Kd" [0.1 0.1 0.1]
+MakeNamedMaterial "matte_black" "string type" 
+	"matte"
+	"float sigma" [0]
+	"color Kd" [0.0 0.0 0.0]
+MakeNamedMaterial "matte_green" "string type" 
+	"matte"
+	"float sigma" [0]
+	"color Kd" [0.0 0.1 0.0]
+#
+# plastic
+#
+MakeNamedMaterial "plastic_coat_flat" "string type" 
+	"plastic"
+	"color Kd" [0 0 0]
+	"color Ks" [1.0 1.0 1.0]
+	"texture roughness" "const_float_zero"
+MakeNamedMaterial "plastic_coat_glossy" "string type" 
+	"plastic"
+	"color Kd" [0 0 0]
+	"color Ks" [1.0 1.0 1.0]
+	"texture roughness" "const_float_0.01"
+MakeNamedMaterial "plastic_coat_rough" "string type" 
+	"plastic"
+	"color Kd" [0 0 0]
+	"color Ks" [1.0 1.0 1.0]
+	"texture roughness" "const_float_one"
+MakeNamedMaterial "plastic_coat_flat_black" "string type" 
+	"plastic"
+	"color Kd" [0 0 0]
+	"color Ks" [0 0 0]
+	"texture roughness" "const_float_zero"
+MakeNamedMaterial "plastic_coat_glossy_black" "string type" 
+	"plastic"
+	"color Kd" [0 0 0]
+	"color Ks" [0 0 0]
+	"texture roughness" "const_float_0.01"
+MakeNamedMaterial "plastic_red" "string type" 
+	"plastic"
+	"color Kd" [1 0 0]
+	"color Ks" [0.9 0.1 0.1]
+MakeNamedMaterial "plastic_blue" "string type" 
+	"plastic"
+	"color Kd" [0 0 1]
+	"color Ks" [0.1 0.1 0.9]
+MakeNamedMaterial "plastic_blue_glossy" "string type" 
+	"plastic"
+	"color Kd" [0 0 1]
+	"color Ks" [0.1 0.1 0.9]
+	"texture roughness" "const_float_0.01"
+MakeNamedMaterial "plastic_blue2_flat" "string type" 
+	"plastic"
+	"color Kd" [0.1 0.35 0.45] # 0.8, 0.3, 0.1
+	"color Ks" [0.7 0.7 0.7]
+	"texture roughness" "const_float_zero"
+MakeNamedMaterial "plastic_blue2_glossy" "string type" 
+	"plastic"
+	"color Kd" [0.1 0.35 0.45]
+	"color Ks" [0.7 0.7 0.7]
+	"texture roughness" "const_float_0.01"
+MakeNamedMaterial "plastic_blue2_rough" "string type" 
+	"plastic"
+	"color Kd" [0.1 0.35 0.45]
+	"color Ks" [0.7 0.7 0.7]
+	"texture roughness" "const_float_one"
+MakeNamedMaterial "plastic_green" "string type" 
+	"plastic"
+	"color Kd" [0 0 0]
+	"color Ks" [0 0.2 0]
+	"texture roughness" "const_float_zero"
+MakeNamedMaterial "plastic_green2_flat" "string type" 
+	"plastic"
+	"color Kd" [0.1 0.45 0.35] # 0.8, 0.1, 0.3
+	"color Ks" [0.7 0.7 0.7]
+	"texture roughness" "const_float_zero"
+MakeNamedMaterial "plastic_green2_glossy" "string type" 
+	"plastic"
+	"color Kd" [0.1 0.45 0.35] # 0.8, 0.1, 0.3
+	"color Ks" [0.7 0.7 0.7]
+	"texture roughness" "const_float_0.01"
+MakeNamedMaterial "plastic_green2_rough" "string type" 
+	"plastic"
+	"color Kd" [0.1 0.45 0.35] # 0.8, 0.1, 0.3
+	"color Ks" [0.7 0.7 0.7]
+	"texture roughness" "const_float_one"
+MakeNamedMaterial "plastic_green_diffuse" "string type" 
+	"plastic"
+	"color Kd" [0 0.8 0]
+	"color Ks" [0 0.8 0]
+MakeNamedMaterial "plastic_black" "string type" 
+	"plastic"
+	"color Kd" [0 0 0]
+	"color Ks" [0 0 0]
+MakeNamedMaterial "plastic_white" "string type" 
+	"plastic"
+	"color Kd" [0.2 0.2 0.2]
+	"color Ks" [0.2 0.2 0.2]
+	"texture roughness" "const_float_zero"
+MakeNamedMaterial "plastic_white_no_diffuse" "string type" 
+	"plastic"
+	"color Kd" [0.0 0.0 0.0]
+	"color Ks" [0.2 0.2 0.2]
+#MakeNamedMaterial "mystique" "string type" 
+#	"measured" 
+#	"string filename" "brdfs/mystique.brdf"
+#MakeNamedMaterial "gmp" "string type" 
+#	"measured" 
+#	"string filename" "/Volumes/Dev/Dev/BRDFs/gold-metallic-paint.binary"
+#MakeNamedMaterial "rmp" "string type" 
+#	"measured" 
+#	"string filename" "/Volumes/Dev/Dev/BRDFs/red-metallic-paint.binary"
+
+# 
+# "amount" is the ratio of the first material
+#
+#Material "layered" 
+#	"string namedmaterial1" "matte" 
+#	"string namedmaterial2" "plastic_red" 
+#	"texture amount" "const"
+
+#Material "plastic"
+#	"texture Kd" "checkerboard"
+#	"float uscale" [40]
+#	"float vscale" [40]
+
+#Material "uber"
+#	"texture Kd" "a_g"
+
+# ior
+Texture "ior_1_5" "float" "constant" "float value" [1.5]
+Texture "ior_3" "float" "constant" "float value" [3]
+# d
+Texture "d_0" "float" "constant" "float value" [0]
+Texture "d_0_001" "float" "constant" "float value" [0.001]
+Texture "d_0_1" "float" "constant" "float value" [0.1]
+Texture "d_0_5" "float" "constant" "float value" [0.5]
+Texture "d_0_7" "float" "constant" "float value" [0.7]
+Texture "d_1" "float" "constant" "float value" [1]
+Texture "d_1_3" "float" "constant" "float value" [1.3]
+Texture "d_1_5" "float" "constant" "float value" [1.5]
+Texture "d_1_8" "float" "constant" "float value" [1.8]
+Texture "d_2" "float" "constant" "float value" [2]
+Texture "d_3" "float" "constant" "float value" [3]
+Texture "d_4" "float" "constant" "float value" [4]
+Texture "d_5" "float" "constant" "float value" [5]
+Texture "d_10" "float" "constant" "float value" [10]
+Texture "d_50" "float" "constant" "float value" [50]
+Texture "d_99" "float" "constant" "float value" [99]
+Texture "d_100" "float" "constant" "float value" [100]
+Texture "d_near_zero" "float" "constant" "float value" [0.0000001]
+# a
+Texture "a" "color" "constant" "color value" [1 1 1]
+Texture "a_near_zero" "color" "constant" "color value" [0.0000001 0.0000001 0.0000001]
+Texture "a_zero" "color" "constant" "color value" [0 0 0]
+Texture "a_100" "color" "constant" "color value" [100 100 100]
+Texture "a_0_1" "color" "constant" "color value" [0.1 0.1 0.1]
+Texture "a_0.01" "color" "constant" "color value" [0.01 0.01 0.01]
+# a: green
+Texture "a_g_1" "color" "constant" "color value" [0.1 1 0.1]
+Texture "a_g_0_1" "color" "constant" "color value" [0.01 0.1 0.01]
+Texture "a_g_0.01" "color" "constant" "color value" [0.001 0.01 0.001]
+# a: cyan
+Texture "a_c_0_1" "color" "constant" "color value" [0.1 0.01 0.1] 
+Texture "a_c_0.01" "color" "constant" "color value" [0.01 0.001 0.01]
+# a: white
+Texture "a_w_1" "color" "constant" "color value" [1 1 1] 
+Texture "a_w_0_5" "color" "constant" "color value" [0.5 0.5 0.5] 
+Texture "a_w_0_1" "color" "constant" "color value" [0.1 0.1 0.1] 
+Texture "a_w_0.01" "color" "constant" "color value" [0.01 0.01 0.01] 
+# a: coat
+Texture "a_coat" "color" "constant" "color value" [0.8 0.3 0.1] 
+Texture "a_coat_white" "color" "constant" "color value" [0.4 0.4 0.4] 
+Texture "a_coat_white_1" "color" "constant" "color value" [0 0 0] 
+Texture "a_coat_red" "color" "constant" "color value" [0.1 0.3 0.8] 
+Texture "a_coat_red_2" "color" "constant" "color value" [0.1 0.8 0.3] 
+Texture "a_coat_green" "color" "constant" "color value" [0.3 0.1 0.8] 
+Texture "a_coat_green_2" "color" "constant" "color value" [0.8 0.1 0.3] 
+Texture "a_coat_blue" "color" "constant" "color value" [0.8 0.3 0.1] 
+Texture "a_coat_blue_2" "color" "constant" "color value" [0.3 0.8 0.1] 
+
+#Material "layered"
+#	"string namedmaterial1" "plastic_coat_flat_black" 
+#	"string namedmaterial2" "matte_black"
+#	"texture thickness" "d_3"
+#	"texture absorption" "a_coat"
+#	"texture ior" "const_float_1.4" #"ior_1_5" #"ior_3"
+#	"texture tir" "on"
+
+#Material "matte"
+#	"float sigma" [0.5]
+#	"color Kd" [0.0 0.1 0.0]
+
+#Material "matte"
+#	"float sigma" [100]
+#	"color Kd" [1 1 1]
+
+#Material "metal"
+#	"texture roughness" "const_float_one"
+
+#Material "plastic" # black body + white specular
+#	"color Kd" [0 0 0]
+#	"color Ks" [1 1 1]
+#	"texture roughness" "const_float_0.01"
+
+#Material "plastic" # blue
+#	"color Kd" [0 0 1]
+#	"color Ks" [0.1 0.1 0.9]
+#	"texture roughness" "const_float_0.01"
+#Material "plastic" # blue2
+#	"color Kd" [0.1 0.35 0.45]
+#	"color Ks" [0.7 0.7 0.7]
+#	"texture roughness" "const_float_one"
+#Material "measured" "string filename" "brdfs/mystique.brdf"
+
+#Material "translucent"
+#	"float ior" 1.5
+
+#Material "glass"
+#	"float ior" 3.5
+
+#Material "measured" 
+#	"string filename" "/Users/joo-haenglee/Dev/BRDFs/gold-metallic-paint.binary"

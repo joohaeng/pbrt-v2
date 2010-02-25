@@ -1,0 +1,6 @@
+AttributeBegin
+LightSource "infinite"
+    "color L" [1 1 1]
+    "string mapname" ["textures/uffizi_latlong.exr"]
+    Include "Lights/LightSample.pbrt"
+AttributeEnd

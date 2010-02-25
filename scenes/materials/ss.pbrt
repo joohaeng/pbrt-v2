@@ -1,0 +1,3 @@
+Material "subsurface"
+	"color sigma_a" [ .05 .05 .05]
+    "color sigma_prime_s" [3 3 3]

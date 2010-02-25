@@ -1,0 +1,4 @@
+Film "image"
+	"integer xresolution" 256
+	"integer yresolution" 256
+	"string filename" "test-ball/layered-ior_1.5-d_1-mat_arbi-bt_metal-br_0.01-cr_0-cn_white-an_red_2-ls_4-mp_16-ds_16-smp_0-bo_false-cfg_3-nb_1-tir_false-dbg_17-L_ufz.exr"
