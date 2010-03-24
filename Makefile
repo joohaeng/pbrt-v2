@@ -14,13 +14,13 @@ DEFS=-DPBRT_STATS_NONE -DPBRT_HAS_PTHREADS -DPBRT_HAS_OPENEXR
 DEFS+= -DNDEBUG
 
 # 32 bit
-#DEFS+=-DPBRT_POINTER_SIZE=4
-#MARCH=-m32 -msse2 -mfpmath=sse
+DEFS+=-DPBRT_POINTER_SIZE=4
+MARCH=-m32 -msse2 -mfpmath=sse
 
 # 64 bit
-DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
-MARCH=-m64
-OPT=-O2
+#DEFS+=-DPBRT_POINTER_SIZE=8 -DPBRT_HAS_64_BIT_ATOMICS
+#MARCH=-m64
+#OPT=-O2
 
 #########################################################################
  
