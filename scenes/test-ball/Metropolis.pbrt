@@ -1,0 +1,4 @@
+Renderer "metropolis" 
+	"integer maxdepth" 7	"bool bidirectional" ["true"]	"bool dodirectseparately" ["true"]
+	"integer samplesperpixel" 16
+	"integer directsamples" 16

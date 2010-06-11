@@ -1,0 +1,87 @@
+#!/opt/local/bin/pbrt
+
+#
+# It is a simple scene file prepared to test material properties
+#
+# Author: Joo-Haeng Lee (joohaeng at gmail dot com)
+#
+# 2010-10-21
+#
+
+#
+# Film
+#
+Include "test-ball/Film.pbrt"
+
+#
+# LookAt
+#
+Include "test-ball/LookAt_x1.pbrt"
+
+#
+# Camera
+#
+Camera "perspective" "float fov" [75] #[42]
+#Camera "orthographic"
+
+#
+# Sampler
+#
+Include "test-ball/Sampler.pbrt"
+
+#
+# PixelFilter
+#
+PixelFilter "mitchell" "float xwidth" [2] "float ywidth" [2]
+
+#
+# SurfaceIntegrator
+#
+#SurfaceIntegrator "whitted" 
+#SurfaceIntegrator "directlighting" 
+#	"integer maxdepth" [1]
+#	"string strategy" "one"
+#SurfaceIntegrator "igi" 
+#SurfaceIntegrator "dipolesubsurface" 
+#	"integer maxdepth" [5] # 5
+#	"float maxerror" [.05] # .05f
+#	"float minsampledistance" [.1] # .25f
+#
+# Renderer
+#
+Include "test-ball/Metropolis.pbrt"
+
+WorldBegin
+
+#Include "Lights/Light-IS-StPeters-L-1.pbrt"
+Include "Lights/Light-IS-Uffizi.pbrt"
+#Include "Lights/Light-IS-1.pbrt"
+#Include "Lights/Light-D-X-L_1.pbrt"
+
+Include "Materials/library.pbrt"
+
+#
+# Single Ball
+#
+Include "test-ball/Material.pbrt"
+AttributeBegin
+
+#Material "glass" "float ior" 1.5
+Shape "sphere" "float radius" 0.5
+
+AttributeBegin
+Translate -0.4 0 0
+Scale 0.5 0.5 0.5
+Rotate 18 0 1 0
+#Include "geometry/dodeca-st.pbrt"
+#Shape "wavefront" "string filename" "geometry/sphere-andrea.obj"
+AttributeEnd
+
+#Scale 0.5 0.5 0.5
+#Include "geometry/cube.pbrt"
+#Include "geometry/ball-metal.pbrt"
+#Include "geometry/Dodecahedron-Trunc_0.4.pbrt"
+
+AttributeEnd
+
+WorldEnd

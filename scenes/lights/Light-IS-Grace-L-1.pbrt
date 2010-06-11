@@ -1,0 +1,17 @@
+AttributeBegin
+
+#Rotate 60 0 0 1
+#Rotate 90 0 1 0
+#Rotate 180 0 1 0
+#Rotate 190 1 0 0
+#Rotate 85 0 0 1
+#Rotate 90 0 1 0
+#Rotate 180 0 1 0
+#Rotate 190 1 0 0
+
+LightSource "infinite"
+    "string mapname"
+	["textures/grace_latlong.exr"]
+   Include "LightSample.pbrt" 
+    "color L" [1 1 1]
+AttributeEnd

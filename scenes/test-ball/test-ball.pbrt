@@ -1,0 +1,56 @@
+#
+# Film
+#
+Include "Film.pbrt"
+
+#
+# LookAt
+#
+Include "LookAt_x1.pbrt"
+
+#
+# Camera
+#
+Camera "perspective" "float fov" [75] #[42]
+
+#
+# Sampler
+#
+Include "Sampler.pbrt"
+
+#
+# PixelFilter
+#
+#PixelFilter "mitchell" "float xwidth" [2] "float ywidth" [2]
+
+#
+# SurfaceIntegrator
+#
+SurfaceIntegrator "directlighting" 
+	"integer maxdepth" [4]
+#SurfaceIntegrator "dipolesubsurface" 
+#	"integer maxdepth" [5] # 5
+#	"float maxerror" [.05] # .05f
+#	"float minsampledistance" [.1] # .25f
+#
+# Renderer
+#
+#Renderer "metropolis" 
+#	"integer samplesperpixel" [128]
+#	"bool dodirectseparately" ["true"]
+#	"integer directsamples" [32]
+
+WorldBegin
+
+Include "../Lights/Light-IS-StPeters-L-1.pbrt"
+
+#
+# Single Ball
+#
+#Include "Material-ss.pbrt"
+Include "Material.pbrt"
+AttributeBegin
+Shape "sphere" "float radius" 0.5
+AttributeEnd
+
+WorldEnd

@@ -1,0 +1,22 @@
+
+Texture "tex_mf_coat" "float" "constant" "float value" 0
+MakeNamedMaterial "mf_coat" "string type" "plastic"
+	"texture roughness" "tex_mf_coat"
+	"color Kd" [0.0 0.0 0.0 ]
+	"color Ks" [1.0 1.0 1.0 ]
+	"float ior" 1.5
+Texture "tex_mf_base" "float" "constant" "float value" 0.01
+MakeNamedMaterial "mf_base" "string type" "metal"
+	"texture roughness" "tex_mf_base"
+Material "layered"
+	"string namedmaterial1" "mf_coat" 
+	"string namedmaterial2" "mf_base"
+	"float exponent" 10000
+	"integer samplingmethod" 0
+	"integer configuration" 3
+	"integer nbundles" 1
+	"float ior" 1.5
+	"float thickness" 1
+	"bool tir" "false"
+	"bool baseonly" "false"
+	"texture absorption" "a_coat_red_2"
